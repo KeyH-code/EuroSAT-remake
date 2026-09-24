@@ -14,7 +14,7 @@
 
 ## 环境与入口
 
-使用 `conda run -n dl-reboot python`。依赖见 `environment.yml`；本机已存在 `dl-reboot` 时无需重建。命令可从任意工作目录运行，以下以仓库根目录为例：
+使用 `conda run -n dl-reboot python`。依赖见 `environment.yml`；本机已存在 `dl-reboot` 时无需重建。以下相对路径命令在仓库根目录运行；从其他目录调用时，请把脚本与参数路径写成绝对路径：
 
 ```powershell
 conda run -n dl-reboot python cnn/train.py --config runs/cnn/first_run/config.json
