@@ -1,0 +1,18 @@
+{
+  "experiment_id": "resnet18_head_sgd_lr0p05_m0p9_20ep_01",
+  "epoch": 20,
+  "loader": {
+    "batch_size": 128,
+    "seed": 20260920
+  },
+  "transform": {
+    "mean": [0.485, 0.456, 0.406],
+    "std": [0.229, 0.224, 0.225]
+  },
+  "optimizer": {
+    "name": "sgd",
+    "learning_rate": 0.05,
+    "momentum": 0.9,
+    "weight_decay": 0
+  }
+}
