@@ -1,0 +1,14 @@
+# 原始数据、每次运行记录、权重与派生结果只在本地保存。
+/data/
+/artifacts/
+/runs/
+/.cache/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.pt
+*.pth
+*.onnx
+*.engine
+*.log
+
