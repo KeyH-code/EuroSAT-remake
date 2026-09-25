@@ -35,15 +35,19 @@ from transforms import (  # noqa: E402
     build_eval_transform,
 )
 sys.path.insert(0, str(PROJECT_ROOT.parent))
-from eurosat_paths import LEGACY_ROOT, RUNS_ROOT  # noqa: E402
+from eurosat_paths import RUNS_ROOT  # noqa: E402
 
-DEFAULT_CHECKPOINT = LEGACY_ROOT / "checkpoints" / "best.pt"
 EVALUATION_DIR = RUNS_ROOT / "cnn_evaluations" / datetime.now().astimezone().strftime("%Y%m%dT%H%M%S_%f")
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        required=True,
+        help="本仓库 runs/ 下训练得到的 checkpoint；历史快照不参与评价",
+    )
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument(
         "--per-class-csv",

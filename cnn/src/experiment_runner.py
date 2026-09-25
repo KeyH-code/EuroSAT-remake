@@ -94,6 +94,7 @@ def _validate_config(config_path, config, resume):
     configured_manifest = Path(data["manifest_path"])
     if not configured_manifest.is_absolute():
         configured_manifest = PROJECT_ROOT / configured_manifest
+    # 只接受本仓库清单；旧仓库的绝对路径不再放行（见 docs/migration-record.md）。
     if configured_manifest.resolve() != MANIFEST.resolve():
         raise ValueError("config manifest_path 不是当前正式 my_split.csv")
     actual_hash = hashlib.sha256(MANIFEST.read_bytes()).hexdigest()
@@ -188,20 +189,21 @@ def _validate_config(config_path, config, resume):
 
 
 def _validate_resume_config(config_path, config, checkpoint):
-    """恢复前核对实验口径；只允许显式延长总轮数及带来源的目录复制。"""
+    """恢复前核对实验口径；只允许显式延长总轮数及带来源的目录复制。
+
+    续训只在本仓库新产物之间进行：checkpoint 必须自带 config 与 config_sha256。
+    历史快照里的旧 checkpoint 不参与续训（旧实验按 docs/migration-record.md 重训）。
+    """
+    for field in ("config", "config_sha256", "config_path"):
+        if field not in checkpoint:
+            raise ValueError(f"checkpoint 缺少 {field}，不是本仓库训练的产物，不支持续训")
     saved_hash = checkpoint["config_sha256"]
     current_hash = hashlib.sha256(config_path.read_bytes()).hexdigest()
     if current_hash == saved_hash:
         original = config
-    elif "config" in checkpoint:
+    else:
         # 新检查点自带当时的配置，原配置文件后来被修改也可审计差异。
         original = checkpoint["config"]
-    else:
-        # 兼容旧检查点：只信任哈希仍与记录一致的原始配置文件。
-        source_path = Path(checkpoint["config_path"])
-        if not source_path.is_file() or hashlib.sha256(source_path.read_bytes()).hexdigest() != saved_hash:
-            raise ValueError("旧 checkpoint 的原配置不可核验，拒绝恢复训练")
-        original = json.loads(source_path.read_text(encoding="utf-8"))
 
     if config["training"]["epochs"] <= checkpoint["epoch"]:
         raise ValueError("目标 epochs 必须大于 checkpoint 已完成的 epoch")

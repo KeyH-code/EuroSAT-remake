@@ -28,16 +28,20 @@ from train_fit_loop import (  # noqa: E402
 )
 from transforms import TRAIN_MEAN, TRAIN_STD, build_eval_transform  # noqa: E402
 sys.path.insert(0, str(PROJECT_ROOT.parent))
-from eurosat_paths import LEGACY_ROOT, RUNS_ROOT  # noqa: E402
+from eurosat_paths import RUNS_ROOT  # noqa: E402
 
-DEFAULT_CHECKPOINT = LEGACY_ROOT / "checkpoints" / "best.pt"
 DEFAULT_OUTPUT = RUNS_ROOT / "cnn_predictions" / (datetime.now().astimezone().strftime("%Y%m%dT%H%M%S_%f") + ".csv")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", type=Path, required=True)
-    parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        required=True,
+        help="本仓库 runs/ 下训练得到的 checkpoint；历史快照不参与预测",
+    )
     parser.add_argument("--out-csv", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--batch-size", type=int, default=128)
     args = parser.parse_args()

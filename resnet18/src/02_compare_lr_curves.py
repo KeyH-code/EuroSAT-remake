@@ -1,4 +1,9 @@
-"""02 将同为 20 轮的学习率实验画在一张验证曲线图上。"""
+"""02 将同为 20 轮的学习率实验画在一张验证曲线图上。
+
+只读取本仓库 `runs/resnet18/` 下的新运行目录；历史快照不参与对照。
+四个同预算实验需先在新仓库重训（参数见 docs/migration-record.md 第 3.2 节），
+否则本脚本会明确报出缺失目录，而不会回退去读历史产物。
+"""
 
 import csv
 from pathlib import Path
@@ -10,14 +15,21 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RUN_ROOT = REPO_ROOT / "artifacts" / "legacy_eurosat" / "resnet18_finetune"
-OUTPUT_ROOT = REPO_ROOT / "runs" / "resnet18" / "analysis"
+RUN_ROOT = REPO_ROOT / "runs" / "resnet18"
+OUTPUT_ROOT = RUN_ROOT / "analysis"
 RUNS = (
     ("0.003", "resnet18_head_lr0p003_20ep_01"),
     ("0.004", "resnet18_head_lr0p004_20ep_01"),
     ("0.005", "resnet18_head_lr0p005_20ep_01"),
     ("0.006", "resnet18_head_lr0p006_20ep_01"),
 )
+
+missing = [str(RUN_ROOT / experiment_id) for _, experiment_id in RUNS if not (RUN_ROOT / experiment_id / "epoch_metrics.csv").is_file()]
+if missing:
+    raise FileNotFoundError(
+        "缺少本仓库运行目录，无法对照；请先在 runs/resnet18/ 下重训这些实验：\n  "
+        + "\n  ".join(missing)
+    )
 
 figure, (acc_axis, loss_axis) = plt.subplots(1, 2, figsize=(12, 4.5))
 for lr, experiment_id in RUNS:

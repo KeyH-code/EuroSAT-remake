@@ -1,4 +1,8 @@
-"""01 独立仓库路径与原清单路径映射，不修改历史 CSV。"""
+"""01 独立仓库路径与原清单路径映射，不修改历史 CSV。
+
+本模块只描述**新仓库自己**的数据、清单和运行目录。历史产物（checkpoint、旧配置、
+旧指标）一律不在这里暴露：旧实验要复用就按 docs/migration-record.md 的参数重训。
+"""
 
 from pathlib import Path, PureWindowsPath
 
@@ -6,7 +10,6 @@ from pathlib import Path, PureWindowsPath
 PROJECT_ROOT = Path(__file__).resolve().parent
 DATA_ROOT = PROJECT_ROOT / "data" / "EuroSAT_RGB" / "2750"
 MANIFEST = PROJECT_ROOT / "data" / "manifests" / "my_split.csv"
-LEGACY_ROOT = PROJECT_ROOT / "artifacts" / "legacy_eurosat"
 RUNS_ROOT = PROJECT_ROOT / "runs"
 
 
@@ -26,4 +29,3 @@ def map_manifest_images(frame):
         for path, label in zip(frame["filepath"], frame["label"], strict=True)
     ]
     return mapped
-

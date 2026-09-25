@@ -25,7 +25,6 @@ from transforms import make_transforms  # noqa: E402
 
 
 OUTPUT_ROOT = REPO_ROOT / "runs" / "resnet18"
-LEGACY_OUTPUT_ROOT = REPO_ROOT / "artifacts" / "legacy_eurosat" / "resnet18_finetune"
 
 
 def main():
@@ -37,8 +36,9 @@ def main():
 
     config_path = args.config.resolve()
     checkpoint_path = args.checkpoint.resolve()
-    if not any(checkpoint_path.is_relative_to(root.resolve()) for root in (OUTPUT_ROOT, LEGACY_OUTPUT_ROOT)):
-        raise ValueError("checkpoint 必须位于本仓库新运行目录或历史快照")
+    # 只评价本仓库 runs/ 下的产物；历史快照不参与，旧实验按 docs/migration-record.md 重训。
+    if not checkpoint_path.is_relative_to(OUTPUT_ROOT.resolve()):
+        raise ValueError("checkpoint 必须位于本仓库 runs/resnet18 下的实验目录")
     if not checkpoint_path.is_file():
         raise FileNotFoundError(checkpoint_path)
     config = json.loads(config_path.read_text(encoding="utf-8"))
