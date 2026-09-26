@@ -14,9 +14,9 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-SRC = PROJECT_ROOT / "src"
-sys.path.insert(0, str(SRC))
+PROJECT_DIR = Path(__file__).resolve().parent
+SRC_DIR = PROJECT_DIR / "src"
+sys.path.insert(0, str(SRC_DIR))
 
 # 当前先复用已经验证的模型定义；正式拆分 train/evaluate 时再机械迁移到 models.py。
 from inference import UnlabeledImageDataset, predict  # noqa: E402
@@ -27,7 +27,7 @@ from train_fit_loop import (  # noqa: E402
     EurosatCNN,
 )
 from transforms import TRAIN_MEAN, TRAIN_STD, build_eval_transform  # noqa: E402
-sys.path.insert(0, str(PROJECT_ROOT.parent))
+sys.path.insert(0, str(PROJECT_DIR.parent))
 from eurosat_paths import RUNS_ROOT  # noqa: E402
 
 DEFAULT_OUTPUT = RUNS_ROOT / "cnn_predictions" / (datetime.now().astimezone().strftime("%Y%m%dT%H%M%S_%f") + ".csv")

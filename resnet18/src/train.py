@@ -1,3 +1,9 @@
+"""配置驱动的 ResNet-18 微调主流程：CLI、续训校验、逐轮记录与 checkpoint。
+
+训练循环在 ``loop.py``，评价与图表在 ``metrics.py`` / ``visualization.py``；
+本模块只负责把这些编排成一次实验。
+"""
+
 import argparse
 import json
 import random
@@ -13,49 +19,14 @@ from torch import nn
 from optimizer import make_optimizer
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_DIR))  # 让正式入口能导入独立的 Agent 支持模块。
+sys.path.insert(0, str(PROJECT_DIR))  # 让正式入口能导入 Agent 支持模块。
 from src.checkpoint import load_checkpoint, save_checkpoint  # noqa: E402
+from src.loop import train_one_epoch  # noqa: E402
 from src.metrics import append_epoch_record, evaluate_classifier  # noqa: E402
 from src.visualization import save_experiment_visualizations  # noqa: E402
 
 OUTPUT_ROOT = REPO_ROOT / "runs" / "resnet18"
 
-def train_one_epoch(model,train_loader,optimizer,scaler):
-    model.train()
-    # 只训练新分类头时，冻结 backbone 的 BN 继续使用预训练的 ImageNet 运行统计量。
-    for module in model.modules():
-        if isinstance(module, nn.BatchNorm2d):
-            module.eval()
-    criterion = nn.CrossEntropyLoss()
-    all_loss = []
-    loss_sum = 0
-    samples_sum = 0
-    all_preds = []
-    correct = 0
-    for x,y in train_loader:
-        optimizer.zero_grad(set_to_none = True)
-        x = x.to(DEVICE)
-        y = y.to(DEVICE)
-
-        with torch.autocast(device_type="cuda",dtype=torch.float16):
-            logits = model(x)
-            loss = criterion(logits,y)
-            pred = logits.argmax(dim=1)
-            correct += (pred == y).sum().item()
-        loss_sum += loss.item()*len(x)
-        samples_sum += len(x)
-        all_loss.append(loss.item())
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
-
-    loss_ave = loss_sum/samples_sum
-    accuracy = correct/samples_sum
-    return {
-        "train_loss_ave":loss_ave,
-        "train_all_loss":all_loss,
-        "train_accuracy":accuracy
-    }
 
 def main():
     parser = argparse.ArgumentParser(description="EuroSAT ResNet-18 微调训练入口")

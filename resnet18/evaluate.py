@@ -1,4 +1,4 @@
-"""05 独立验证入口：加载指定 checkpoint，在固定 val split 上评价并导出图表。"""
+"""ResNet18 独立验证入口：加载指定 checkpoint，在固定 val split 上评价并导出图表。"""
 
 import argparse
 from datetime import datetime
@@ -12,7 +12,8 @@ from torch import nn
 
 PROJECT_DIR = Path(__file__).resolve().parent
 SRC_DIR = PROJECT_DIR / "src"
-sys.path.insert(0, str(SRC_DIR))  # 兼容当前学习者模块的同目录导入写法。
+sys.path.insert(0, str(SRC_DIR))
+sys.path.insert(0, str(PROJECT_DIR))
 
 from data import DEVICE, REPO_ROOT, make_loader  # noqa: E402
 from src.checkpoint import load_checkpoint  # noqa: E402

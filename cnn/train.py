@@ -4,8 +4,9 @@ import argparse
 import sys
 from pathlib import Path
 
-SRC = Path(__file__).resolve().parent / "src"
-sys.path.insert(0, str(SRC))
+PROJECT_DIR = Path(__file__).resolve().parent
+SRC_DIR = PROJECT_DIR / "src"
+sys.path.insert(0, str(SRC_DIR))
 
 from experiment_runner import run_experiment  # noqa: E402
 

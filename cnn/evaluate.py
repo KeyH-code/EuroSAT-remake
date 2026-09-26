@@ -1,7 +1,7 @@
 """EuroSAT 固定验证集评价入口。
 
-直接复用学习者在 ``train_fit_loop.py`` 中完成的 evaluate、混淆矩阵、
-逐类指标和错误样本导出逻辑，只补 checkpoint 加载与结果落盘外壳。
+复用 ``train_fit_loop.py`` 的 evaluate、混淆矩阵、逐类指标与错误样本导出逻辑，
+本文件只补 checkpoint 加载与结果落盘。
 """
 
 import argparse
@@ -16,9 +16,9 @@ import pandas as pd
 import torch
 from torch import nn
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-SRC = PROJECT_ROOT / "src"
-sys.path.insert(0, str(SRC))
+PROJECT_DIR = Path(__file__).resolve().parent
+SRC_DIR = PROJECT_DIR / "src"
+sys.path.insert(0, str(SRC_DIR))
 
 from train_fit_loop import (  # noqa: E402
     CLASS_NAMES,
@@ -34,7 +34,7 @@ from transforms import (  # noqa: E402
     TRAIN_STD,
     build_eval_transform,
 )
-sys.path.insert(0, str(PROJECT_ROOT.parent))
+sys.path.insert(0, str(PROJECT_DIR.parent))
 from eurosat_paths import RUNS_ROOT  # noqa: E402
 
 EVALUATION_DIR = RUNS_ROOT / "cnn_evaluations" / datetime.now().astimezone().strftime("%Y%m%dT%H%M%S_%f")

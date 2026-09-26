@@ -14,6 +14,12 @@
 - `artifacts/legacy_eurosat/`：历史运行记录快照（1.24 GB），只读、不被任何代码读取。
 - `artifacts/legacy_teaching/`：教学期与迁移期的代码/文档归档，**不可运行、不可 import**；内容清单见该目录的 `README.md`。
 
+两条模型线采用同一套结构约定：
+
+- 顶层 `train.py` / `evaluate.py` / `predict.py` 是**命令行入口**，只做参数解析、路径设置与结果落盘；`resnet18/train.py` 只是把 `main()` 从 `src/train.py` 转发出来。
+- `src/` 放**可复用模块**，不放 `main()`：`data.py` 数据、`model.py` 模型、`transforms.py` 预处理、`optimizer.py` 优化器、`loop.py`（CNN 侧为 `train_fit_loop.py`）训练循环、`metrics.py` 指标、`checkpoint.py` 存档、`inference.py` 推理、`visualization.py` 图表。
+- 所有入口用同一套路径变量：`PROJECT_DIR`（本目录）+ `SRC_DIR = PROJECT_DIR / "src"`。
+
 ## 环境与入口
 
 使用 `conda run -n dl-reboot python`。依赖见 `environment.yml`；本机已存在 `dl-reboot` 时无需重建。以下相对路径命令在仓库根目录运行：
