@@ -22,7 +22,8 @@ for parameter in model.parameters():
 model.fc = nn.Linear(model.fc.in_features,NUM_CLASSES)
 
 # 只训练分类头不足以产出结果，继续解冻 layer4。
-# 决定记录见 docs/migration-record.md 第 8 节：只训分类头历史最佳 0.9538，未达 98%。
+# 依据：只训分类头在 5-35 轮、12 组配置范围内历史最佳 0.9538，未达 98%；
+# 详见 resnet18/reports/09_history_baselines.md。
 # 注意：这一步只改 requires_grad，不改变模型结构，因此旧 checkpoint 仍能 load_state_dict；
 # 但可训练范围已经变化，TRAINABLE_SCOPE 用于在续训时拦住不兼容的旧实验。
 for parameter in model.layer4.parameters():

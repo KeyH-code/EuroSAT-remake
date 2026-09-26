@@ -1,16 +1,18 @@
-# EuroSAT RGB：独立训练与推理
+# EuroSAT RGB：训练与推理
 
-这个仓库把小 CNN 与 ImageNet 预训练 ResNet18 微调从教学工程复制出来，并**独立运行**：不读取旧教学项目，也不读取任何历史产物。历史 `my_split.csv` 的字节未改；程序只在内存中把其中的旧图片路径映射到 `data/EuroSAT_RGB/2750/`。固定划分为 train 18900、val 4050、test 4050；训练过程只看 train/val，test 保留给最终一次评估。
+小 CNN 与 ImageNet 预训练 ResNet18 两条线，共用同一份 EuroSAT RGB 数据和固定划分。
+程序只在内存中把清单里记录的旧图片路径映射到 `data/EuroSAT_RGB/2750/`。
+固定划分为 train 18900、val 4050、test 4050；训练过程只看 train/val，test 保留给最终一次评估。
 
 ## 目录
 
 - `cnn/`：小 CNN 的 train/evaluate/predict、源码和配置模板。
-- `resnet18/`：ResNet18 的 train/evaluate/predict、源码、配置及历史报告。当前可训练范围为 **`layer4 + fc`**（`layer3` 及更早冻结），见 `resnet18/src/model.py` 的 `TRAINABLE_SCOPE` 与 `docs/migration-record.md` 第 8 节。
+- `resnet18/`：ResNet18 的 train/evaluate/predict、源码、配置及实验报告。当前可训练范围为 **`layer4 + fc`**（`layer3` 及更早冻结），见 `resnet18/src/model.py` 的 `TRAINABLE_SCOPE`；结论依据见 `resnet18/reports/09_history_baselines.md`。
 - `data/`：完整图片与原样清单，Git 忽略。
-- `runs/`：新训练、评价、预测结果，Git 忽略。**所有产物只写这里。**
-- `artifacts/`：仅存原预训练权重 `resnet18-f37072fd.pth`；运行缓存副本在 `.cache/torch/hub/checkpoints/`。
-- `artifacts/legacy_eurosat/`：迁移时原样冻结的历史运行记录快照（1.24 GB）。**任何代码都不读它**，也不要在里面训练。内容索引与核对哈希见 `docs/migration-record.md` 与 `docs/legacy-configs/`。
-- `docs/`：`migration-record.md`（迁移记录与历史结果）、`legacy-configs/`（旧配置档案）、`provenance.md`（来源核验）。
+- `runs/`：训练、评价、预测结果，Git 忽略。**所有产物只写这里。**
+- `artifacts/`：原预训练权重 `resnet18-f37072fd.pth`；运行缓存副本在 `.cache/torch/hub/checkpoints/`。
+- `artifacts/legacy_eurosat/`：历史运行记录快照（1.24 GB），只读、不被任何代码读取。
+- `artifacts/legacy_teaching/`：教学期与迁移期的代码/文档归档，**不可运行、不可 import**；内容清单见该目录的 `README.md`。
 
 ## 环境与入口
 
@@ -34,15 +36,25 @@ ResNet18 按 `experiment_id` 创建新目录，目录已存在会拒绝覆盖。
 
 **学习率注意**：`config01`–`16` 的 lr（0.001–0.05）是**冻结分类头**设定下调出来的。解冻 layer4 后 0.001 与 3e-4 会在第一个 batch 之后退化（loss 塌到 0、logits 爆炸），已实测稳定上限约为 5e-5–1e-4。改配置时不要直接沿用旧 lr。
 
-## 历史产物与重训
+## 实验记录
 
-历史实验记录**只作档案**：`docs/migration-record.md` 记录了当时每一组配置参数与 val 指标（小 CNN 最佳 0.9402、ResNet18 最佳 0.9538，均未达 98%），`docs/legacy-configs/README.md` 登记了旧配置的位置与 SHA-256。
+- `resnet18/reports/01`–`08`：ResNet18 冻结分类头阶段的逐次实验报告。
+- `resnet18/reports/09_history_baselines.md`：两个模型全部历史实验的 val 指标与参数索引汇总。
 
-要复用旧实验，**按记录里的参数在新仓库重新训练**，写入 `runs/`；不要从快照复制 checkpoint 或配置，也不要让新运行写回 `artifacts/legacy_eurosat/`。历史 checkpoint 不参与续训，续训只在本仓库新产物之间进行（`cnn/train.py --resume` 要求 checkpoint 自带配置与哈希）。
+历史实验要复用，按报告里的参数在 `runs/` 下重新训练；续训只在本仓库产物之间进行（`cnn/train.py --resume` 要求 checkpoint 自带配置与哈希，`resnet18/src/train.py` 还要求 `trainable_scope` 一致）。
 
-新仓库当前已有的基线产物：
+当前已有产物：
 
-- `runs/cnn/baseline_ep2/`：小 CNN 2 轮（`formal_training` 参数，仅缩短轮数），val acc 0.838519。
-- `runs/resnet18/resnet18_head_probe_1ep_01/`：ResNet18 冻结分类头 1 轮，配置 `resnet18/configs/config17_probe_1ep.json`，val acc 0.905926。
+- `runs/cnn/baseline_ep2/`：小 CNN 2 轮，val acc 0.838519。
+- `runs/resnet18/resnet18_layer4_lr5e-5_probe_1ep_01/`：解冻 layer4 后 1 轮，val acc 0.9410。
+- `runs/resnet18/resnet18_head_probe_1ep_01/`：冻结分类头 1 轮（旧设定），val acc 0.905926。
 
-两者都只用于验证入口链路，不构成 M2 验收证据。
+## 测试
+
+仓库当前没有自动化测试。改代码后按下述方式人工验证链路：
+
+```powershell
+conda run -n dl-reboot python cnn/train.py --config runs/cnn/<实验名>/config.json      # 跑通一轮
+conda run -n dl-reboot python resnet18/train.py --config resnet18/configs/<新配置>.json  # 跑通一轮
+conda run -n dl-reboot python -m compileall -q cnn resnet18 eurosat_paths.py
+```

@@ -1,30 +1,16 @@
-﻿r"""第一段真实训练（骨架由 Agent 提供，两个关键函数留给学习者填写）。
+r"""EuroSAT 小 CNN 的训练与评价核心。
 
-它把 M2-C1 已经做完的两段接起来，只补中间缺的一环：
+本模块只提供可复用的训练/评价函数与固定契约（类别顺序、清单、归一化常数）：
+    - ``EurosatCNN``、``make_loader``、``train_one_epoch``、``evaluate``
+    - ``fix_seed``、``save_per_class_metrics``
+调用方是 ``cnn/src/experiment_runner.py``（配置驱动正式训练）与 ``cnn/evaluate.py``、
+``cnn/predict.py``。本模块自身不再是脚本入口。
 
-    my_split.csv ──> EuroSATDataset ──> DataLoader ──> 批次 ──┐
-                                                               │
-                                     模型 forward ──> loss ──> backward ──> step
-                                                               │
-                                     val 批次 ──> 推理 ──> 累计 loss / 正确数
+教学期"自己写一遍训练循环"的独立入口已切走，完整原件见
+``artifacts/legacy_teaching/cnn/src/train_fit_loop_original.py``。
 
-要你填的只有两个函数，它们各回答一个问题：
-  - `train_one_epoch`：一个 epoch 里，一批数据怎样变成一次参数更新？
-  - `evaluate`：判卷时为什么不能更新参数，指标又该按什么口径累计？
-
-三个容易做反的点（属于契约，不是风格问题）：
-  1. `model.train()` / `model.eval()` 写在 epoch 循环里、调用函数之前，
-     不要写在批循环里。模式是"这一段数据用来学还是用来判卷"的属性，
-     不是"这一批"的属性；写在批循环里会让每个批次都切一次，代价白花。
-  2. 要搬到卡上的是**每一批数据**，不是数据集。模型只在开始时搬一次。
-  3. `predicted == target` 得到逐样本布尔向量；对它求和就是本批正确数，
-     直接累计后除以总样本数，不要再乘 batch_size。批均值 loss 才需要先乘
-     本批样本数还原为该批 loss 总和，再除以全体验证样本数。
-
-用法（固定读取完整 my_split.csv）：
-    conda run -n dl-reboot python src/train_fit_loop.py
+``train_one_epoch`` 的 autocast 契约：只有传入 scaler 时才进入 autocast，FP32 走空上下文。
 """
-
 import argparse
 import json
 import random
@@ -44,8 +30,7 @@ import hashlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # 让同目录模块可导入
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # 独立仓库的路径契约
-from eurosat_paths import MANIFEST, RUNS_ROOT, map_manifest_images  # noqa: E402
-
+from eurosat_paths import MANIFEST, map_manifest_images  # noqa: E402
 from transforms import (  # noqa: E402
     TRAIN_MEAN,
     TRAIN_STD,
@@ -53,14 +38,10 @@ from transforms import (  # noqa: E402
     build_train_transform,
 )
 
-# 清单是 C1 亲手划分的产物：四列 filepath,label,label_idx,split
-PER_CLASS_METRICS_CSV = RUNS_ROOT / "cnn_manual" / "per_class_metrics.csv"
-ERROR_SAMPLES_CSV = RUNS_ROOT / "cnn_manual" / "error_samples.csv"
-RUNS_DIR = RUNS_ROOT / "cnn_manual"
-NUM_CLASSES = 10   # EuroSAT 的 10 个类别，编号规则见 LABELS.md
+NUM_CLASSES = 10   # EuroSAT 的 10 个类别
 SEED = 20260920
 
-# EuroSAT 类别名，顺序即 label_idx（和 LABELS.md 一致）
+# EuroSAT 类别名，顺序即 label_idx
 CLASS_NAMES = [
     "AnnualCrop", "Forest", "HerbaceousVegetation", "Highway",
     "Industrial", "Pasture", "PermanentCrop", "Residential",
@@ -335,263 +316,3 @@ def save_per_class_metrics(cm, out_csv):
     return df
 
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--amp", action="store_true", help="启用 autocast + GradScaler")
-    parser.add_argument("--epochs", type=int, default=3)
-    parser.add_argument("--batch-size", type=int, default=128)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="从 last.pt 恢复；--epochs 表示恢复后的目标总轮次",
-    )
-    args = parser.parse_args()
-
-    # 固定种子：本块只要求"同样的配置跑出同样的初始化与打乱顺序"
-    fix_seed(SEED)
-    device = torch.device("cuda")
-    print("设备:", torch.cuda.get_device_name(0))
-    print("torch:", torch.__version__, "| 参数:",
-          f"epochs={args.epochs} batch={args.batch_size} lr={args.lr} "
-          f"amp={args.amp}")
-    print("清单:", MANIFEST)
-
-    # train 用带随机增强的 transform（当前还没有增强，但两条路径已经分开），
-    # val 用确定性 transform：同一个样本读两次必须逐位相同。
-    train_loader = make_loader("train", build_train_transform(),
-                               args.batch_size, shuffle=True, seed=SEED)
-    val_loader = make_loader("val", build_eval_transform(),
-                             args.batch_size, shuffle=False)
-    print(f"train 批次数={len(train_loader)}  val 批次数={len(val_loader)}")
-
-    model = EurosatCNN().to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-    # AMP 开关：不开就是 None，train_one_epoch 走纯 FP32 分支；
-    # 开了则由 scaler 负责放大反向、unscale 更新和跳步决策。
-    scaler = torch.amp.GradScaler("cuda") if args.amp else None
-    print("precision:", "AMP (autocast fp16 + GradScaler)" if scaler else "FP32")
-
-    # checkpoint
-    last_checkpoint_path = RUNS_DIR / "checkpoints" / "last.pt"
-    best_checkpoint_path = RUNS_DIR / "checkpoints" / "best.pt"
-    last_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-    best_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-    checkpoint = {}
-    manifest_sha256 = hashlib.sha256(MANIFEST.read_bytes()).hexdigest()
-    checkpoint["manifest_sha256"] = manifest_sha256
-    checkpoint["model_name"] = "EurosatCNN"
-    checkpoint["num_classes"] = NUM_CLASSES
-    checkpoint["manifest_path"] = str(MANIFEST)
-    checkpoint["class_names"] = CLASS_NAMES
-    checkpoint["normalization_mean"] = TRAIN_MEAN
-    checkpoint["normalization_std"] = TRAIN_STD
-
-    best_val_acc = float("-inf")
-    best_epoch = 0
-    start_epoch = 1
-    resumed_from_epoch = None
-    resumed_from_run_id = None
-
-    # 恢复必须发生在训练循环之前。这里沿用已经绑定到 model 的 optimizer
-    # 以及由 --amp 决定是否存在的 scaler，避免恢复到另一套运行对象上。
-    if args.resume:
-        checkpoint = torch.load(
-            last_checkpoint_path,
-            weights_only=False,
-            # RNG 与 DataLoader generator 的状态必须保持为 CPU ByteTensor；
-            # 模型和优化器在 load_state_dict 时会恢复到其运行参数所在设备。
-            map_location="cpu",
-        )
-
-        # 连续训练要求会改变数据顺序或数值路径的配置保持一致。
-        saved_args = checkpoint["args"]
-        if saved_args["batch_size"] != args.batch_size:
-            raise ValueError(
-                "恢复训练时 batch-size 必须与 checkpoint 一致："
-                f"saved={saved_args['batch_size']} current={args.batch_size}"
-            )
-        if saved_args["amp"] != args.amp:
-            raise ValueError(
-                "恢复训练时 AMP 模式必须与 checkpoint 一致："
-                f"saved={saved_args['amp']} current={args.amp}"
-            )
-        if checkpoint["manifest_sha256"] != manifest_sha256:
-            raise ValueError("当前 manifest 与 checkpoint 记录的版本不一致")
-
-        model.load_state_dict(checkpoint["model_state"])
-        optimizer.load_state_dict(checkpoint["optimizer_state"])
-        if checkpoint["scaler_state"] is not None:
-            scaler.load_state_dict(checkpoint["scaler_state"])
-
-        start_epoch = checkpoint["epoch"] + 1
-        best_val_acc = checkpoint["best_val_acc"]
-        best_epoch = checkpoint["best_epoch"]
-        resumed_from_epoch = checkpoint["epoch"]
-        resumed_from_run_id = checkpoint.get("run_id")
-
-        # 最后恢复随机状态，使下一次采样和随机运算接在保存点之后。
-        random.setstate(checkpoint["rng_state"]["pythonRandom"])
-        np.random.set_state(checkpoint["rng_state"]["numpyRandom"])
-        torch.set_rng_state(checkpoint["rng_state"]["torchRandom"])
-        torch.cuda.set_rng_state_all(checkpoint["rng_state"]["cudaRandom"])
-        train_loader.generator.set_state(checkpoint["rng_state"]["loaderRandom"])
-
-        if start_epoch > args.epochs:
-            raise ValueError(
-                f"checkpoint 已完成 epoch {checkpoint['epoch']}，"
-                f"目标总轮次 --epochs={args.epochs} 没有可训练的轮次"
-            )
-        print(
-            f"恢复 checkpoint: epoch={checkpoint['epoch']}，"
-            f"将训练 epoch {start_epoch}..{args.epochs}"
-        )
-
-    # 每次脚本调用都是一次可审计运行。目录名包含到微秒的本地时间，
-    # exist_ok=False 让极少数命名冲突显式失败，不静默覆盖旧证据。
-    created_at = datetime.now().astimezone()
-    run_id = created_at.strftime("run_%Y%m%dT%H%M%S_%f%z")
-    run_dir = RUNS_DIR / run_id
-    run_dir.mkdir(parents=True, exist_ok=False)
-    run_config_path = run_dir / "run_config.json"
-    metrics_path = run_dir / "metrics.jsonl"
-
-    # 这是运行开始前即可确定的事实快照；Path、device 等对象先转成字符串，
-    # 保证内容能被标准 JSON 直接读取，而不依赖 PyTorch。
-    run_config = {
-        "run_id": run_id,
-        "created_at": created_at.isoformat(),
-        "entrypoint": str(Path(sys.argv[0]).resolve()),
-        "resume": args.resume,
-        "resumed_from_epoch": resumed_from_epoch,
-        "resumed_from_run_id": resumed_from_run_id,
-        "resumed_from_checkpoint": str(last_checkpoint_path) if args.resume else None,
-        "manifest_path": str(MANIFEST),
-        "manifest_sha256": manifest_sha256,
-        "model_name": "EurosatCNN",
-        "num_classes": NUM_CLASSES,
-        "class_names": CLASS_NAMES,
-        "normalization_mean": TRAIN_MEAN,
-        "normalization_std": TRAIN_STD,
-        "seed": SEED,
-        "batch_size": args.batch_size,
-        # 恢复后以 optimizer 中的实际值为准，避免 CLI 默认值冒充真实学习率。
-        "learning_rate": optimizer.param_groups[0]["lr"],
-        "target_total_epochs": args.epochs,
-        "start_epoch": start_epoch,
-        "device": str(device),
-        "gpu_name": torch.cuda.get_device_name(0),
-        "precision": "amp_fp16" if scaler is not None else "fp32",
-        "python_version": sys.version.split()[0],
-        "torch_version": str(torch.__version__),
-        "cuda_version": str(torch.version.cuda),
-        "last_checkpoint_path": str(last_checkpoint_path),
-        "best_checkpoint_path": str(best_checkpoint_path),
-        "per_class_metrics_path": str(PER_CLASS_METRICS_CSV),
-        "error_samples_path": str(ERROR_SAMPLES_CSV),
-    }
-    run_config_path.write_text(
-        json.dumps(run_config, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    print("运行目录:", run_dir)
-
-    for epoch in range(start_epoch, args.epochs + 1):
-        # 峰值按 epoch 单独计量，避免上一轮的历史峰值污染本轮记录。
-        torch.cuda.reset_peak_memory_stats()
-        start = time.perf_counter()
-        train_loss, train_acc, skipped = train_one_epoch(
-            model, train_loader, optimizer, criterion, device, scaler)
-        val_loss, val_acc, cm, _,_,_ = evaluate(model, val_loader, criterion, device)
-        seconds = time.perf_counter() - start
-        peak_mb = torch.cuda.max_memory_allocated() / 1024 ** 2
-        peak_reserved_mb = torch.cuda.max_memory_reserved() / 1024 ** 2
-        print(f"epoch {epoch}: train_loss={train_loss:.4f} train_acc={train_acc:.4f} | "
-              f"val_loss={val_loss:.4f} val_acc={val_acc:.4f} | "
-              f"skipped={skipped} | {seconds:.1f}s "
-              f"peak_alloc={peak_mb:.0f}MB peak_reserved={peak_reserved_mb:.0f}MB")
-        checkpoint["model_state"] = model.state_dict()
-        checkpoint["optimizer_state"] = optimizer.state_dict()
-        checkpoint["scaler_state"] = scaler.state_dict() if scaler is not None else None
-        checkpoint["seed"] = SEED
-        checkpoint["args"] = vars(args)
-        checkpoint["epoch"] = epoch
-
-        rng_state = {
-            "pythonRandom":random.getstate(),
-            "numpyRandom":np.random.get_state(),
-            "torchRandom":torch.get_rng_state(),
-            "cudaRandom":torch.cuda.get_rng_state_all(),
-            "loaderRandom":train_loader.generator.get_state()
-        }
-        checkpoint["rng_state"] = rng_state
-        is_best = val_acc > best_val_acc
-        if is_best:
-            best_val_acc = val_acc
-            best_epoch = epoch
-
-        checkpoint["best_val_acc"] = best_val_acc
-        checkpoint["best_epoch"] = best_epoch
-        checkpoint["run_id"] = run_id
-        checkpoint["run_dir"] = str(run_dir)
-
-        torch.save(checkpoint, last_checkpoint_path)
-
-        if is_best:
-            torch.save(checkpoint, best_checkpoint_path)
-
-        # JSON Lines 每行是一条独立 JSON；一轮完成后才追加，适合逐轮读取和追查。
-        epoch_record = {
-            "epoch": epoch,
-            "train_loss": train_loss,
-            "train_accuracy": train_acc,
-            "val_loss": val_loss,
-            "val_accuracy": val_acc,
-            "seconds": seconds,
-            "skipped_steps": skipped,
-            "peak_allocated_mb": peak_mb,
-            "peak_reserved_mb": peak_reserved_mb,
-            "is_best": is_best,
-            "best_epoch": best_epoch,
-            "best_val_accuracy": best_val_acc,
-        }
-        with metrics_path.open("a", encoding="utf-8", newline="\n") as file:
-            file.write(json.dumps(epoch_record, ensure_ascii=False) + "\n")
-
-
-    # 最后再判一次卷，用最新的模型算 per-class 指标
-    val_loss, val_acc, cm, all_labels, all_preds, all_confidences = evaluate(
-        model, val_loader, criterion, device
-    )
-
-    error_rows = []
-    for image,label,pred,confidence in zip(val_loader.dataset.images,all_labels,all_preds,all_confidences,strict=True):
-        if pred != label:
-            error_rows.append(
-                {
-                    "filepath": image,
-                    "true_idx": label,
-                    "true_class": CLASS_NAMES[label],
-                    "pred_idx": pred,
-                    "pred_class": CLASS_NAMES[pred],
-                    "confidence": confidence
-                }
-            )
-    error_rows = sorted(error_rows,key=lambda d: d["confidence"],reverse=True)
-    error_columns = [
-        "filepath", "true_idx", "true_class",
-        "pred_idx", "pred_class", "confidence",
-    ]
-    dataframe = pd.DataFrame(error_rows, columns=error_columns)
-    dataframe.to_csv(ERROR_SAMPLES_CSV, index=False, encoding="utf-8-sig")
-    print("错误样本总数：", len(error_rows))
-    print("置信度最高的前 20 条：")
-    print(dataframe.head(20).to_string(index=False))
-    print("path：", ERROR_SAMPLES_CSV)
-
-    save_per_class_metrics(cm, PER_CLASS_METRICS_CSV)
-
-if __name__ == "__main__":
-    main()

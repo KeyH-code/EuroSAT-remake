@@ -94,7 +94,7 @@ def _validate_config(config_path, config, resume):
     configured_manifest = Path(data["manifest_path"])
     if not configured_manifest.is_absolute():
         configured_manifest = PROJECT_ROOT / configured_manifest
-    # 只接受本仓库清单；旧仓库的绝对路径不再放行（见 docs/migration-record.md）。
+    # 只接受本仓库清单；其他位置的清单一律拒绝。
     if configured_manifest.resolve() != MANIFEST.resolve():
         raise ValueError("config manifest_path 不是当前正式 my_split.csv")
     actual_hash = hashlib.sha256(MANIFEST.read_bytes()).hexdigest()
@@ -191,8 +191,7 @@ def _validate_config(config_path, config, resume):
 def _validate_resume_config(config_path, config, checkpoint):
     """恢复前核对实验口径；只允许显式延长总轮数及带来源的目录复制。
 
-    续训只在本仓库新产物之间进行：checkpoint 必须自带 config 与 config_sha256。
-    历史快照里的旧 checkpoint 不参与续训（旧实验按 docs/migration-record.md 重训）。
+    续训只在本仓库产物之间进行：checkpoint 必须自带 config 与 config_sha256。
     """
     for field in ("config", "config_sha256", "config_path"):
         if field not in checkpoint:

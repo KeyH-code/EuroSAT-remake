@@ -36,7 +36,7 @@ def main():
 
     config_path = args.config.resolve()
     checkpoint_path = args.checkpoint.resolve()
-    # 只评价本仓库 runs/ 下的产物；历史快照不参与，旧实验按 docs/migration-record.md 重训。
+    # 只评价本仓库 runs/ 下训练得到的产物。
     if not checkpoint_path.is_relative_to(OUTPUT_ROOT.resolve()):
         raise ValueError("checkpoint 必须位于本仓库 runs/resnet18 下的实验目录")
     if not checkpoint_path.is_file():
@@ -57,7 +57,7 @@ def main():
     criterion = nn.CrossEntropyLoss()
     result = evaluate_classifier(model, val_loader, criterion, DEVICE)
 
-    # 历史运行快照只读，任何新评价均写入独立 runs 目录；不会读取 test。
+    # 任何新评价均写入独立 runs 目录；不会读取 test。
     run_dir = checkpoint_path.parent.parent
     stamp = datetime.now().astimezone().strftime("%Y%m%dT%H%M%S_%f")
     output_dir = args.output_dir or (OUTPUT_ROOT / "evaluations" / f"{run_dir.name}_{stamp}")

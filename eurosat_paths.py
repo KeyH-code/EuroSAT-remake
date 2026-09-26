@@ -1,7 +1,7 @@
-"""01 独立仓库路径与原清单路径映射，不修改历史 CSV。
+"""仓库路径契约：数据、清单与运行目录，不修改原始 CSV。
 
-本模块只描述**新仓库自己**的数据、清单和运行目录。历史产物（checkpoint、旧配置、
-旧指标）一律不在这里暴露：旧实验要复用就按 docs/migration-record.md 的参数重训。
+本模块是路径的唯一出口。清单里记录的旧绝对路径不参与运行时定位，只在内存中按
+「类别 + 文件名」映射到 ``data/EuroSAT_RGB/2750/``。
 """
 
 from pathlib import Path, PureWindowsPath
@@ -14,7 +14,7 @@ RUNS_ROOT = PROJECT_ROOT / "runs"
 
 
 def local_image_path(recorded_path, label):
-    """按类别和文件名定位复制图像；绝不回退读取教学项目的旧绝对路径。"""
+    """按类别和文件名定位本仓库图像。"""
     original = PureWindowsPath(str(recorded_path))
     if original.parent.name != label or original.suffix.lower() not in {".jpg", ".jpeg", ".png"}:
         raise ValueError(f"清单路径与类别不一致：{recorded_path}")
