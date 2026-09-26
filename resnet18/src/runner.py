@@ -1,7 +1,8 @@
-"""配置驱动的 ResNet-18 微调主流程：CLI、续训校验、逐轮记录与 checkpoint。
+"""ResNet-18 实验编排：CLI、续训校验、逐轮记录与 checkpoint。
 
-训练循环在 ``loop.py``，评价与图表在 ``metrics.py`` / ``visualization.py``；
-本模块只负责把这些编排成一次实验。
+对应 ``cnn/src/experiment_runner.py`` 的角色。训练循环在 ``loop.py``，评价与图表在
+``metrics.py`` / ``visualization.py``；本模块只负责把它们编排成一次实验，
+命令行入口是顶层的 ``resnet18/train.py``。
 """
 
 import argparse

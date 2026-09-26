@@ -1,6 +1,6 @@
 """ResNet-18 微调的训练循环。
 
-只提供可复用函数，不含 CLI 与编排；调用方是 ``src/train.py``。
+只提供可复用函数，不含 CLI 与编排；调用方是 ``runner.py``。
 """
 
 import torch

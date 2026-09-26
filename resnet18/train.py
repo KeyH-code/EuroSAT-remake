@@ -1,4 +1,4 @@
-"""ResNet18 训练入口：参数解析与训练主流程都在 ``src/train.py``。"""
+"""ResNet18 训练入口：参数解析与训练主流程都在 ``src/runner.py``。"""
 
 import sys
 from pathlib import Path
@@ -9,7 +9,7 @@ SRC_DIR = PROJECT_DIR / "src"
 sys.path.insert(0, str(SRC_DIR))
 sys.path.insert(0, str(PROJECT_DIR))
 
-from src.train import main  # noqa: E402
+from src.runner import main  # noqa: E402
 
 
 if __name__ == "__main__":

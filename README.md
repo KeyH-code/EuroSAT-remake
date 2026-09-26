@@ -16,8 +16,8 @@
 
 两条模型线采用同一套结构约定：
 
-- 顶层 `train.py` / `evaluate.py` / `predict.py` 是**命令行入口**，只做参数解析、路径设置与结果落盘；`resnet18/train.py` 只是把 `main()` 从 `src/train.py` 转发出来。
-- `src/` 放**可复用模块**，不放 `main()`：`data.py` 数据、`model.py` 模型、`transforms.py` 预处理、`optimizer.py` 优化器、`loop.py`（CNN 侧为 `train_fit_loop.py`）训练循环、`metrics.py` 指标、`checkpoint.py` 存档、`inference.py` 推理、`visualization.py` 图表。
+- 顶层 `train.py` / `evaluate.py` / `predict.py` 是**命令行入口**，只做参数解析、路径设置与结果落盘；`resnet18/train.py` 只是把 `main()` 从 `src/runner.py` 转发出来。
+- `src/` 放**可复用模块**，不放 `main()`：`data.py` 数据、`model.py` 模型、`transforms.py` 预处理、`optimizer.py` 优化器、`loop.py`（CNN 侧为 `train_fit_loop.py`）训练循环、`runner.py`（CNN 侧为 `experiment_runner.py`）实验编排、`metrics.py` 指标、`checkpoint.py` 存档、`inference.py` 推理、`visualization.py` 图表。
 - 所有入口用同一套路径变量：`PROJECT_DIR`（本目录）+ `SRC_DIR = PROJECT_DIR / "src"`。
 
 ## 环境与入口
@@ -47,7 +47,7 @@ ResNet18 按 `experiment_id` 创建新目录，目录已存在会拒绝覆盖。
 - `resnet18/reports/01`–`08`：ResNet18 冻结分类头阶段的逐次实验报告。
 - `resnet18/reports/09_history_baselines.md`：两个模型全部历史实验的 val 指标与参数索引汇总。
 
-历史实验要复用，按报告里的参数在 `runs/` 下重新训练；续训只在本仓库产物之间进行（`cnn/train.py --resume` 要求 checkpoint 自带配置与哈希，`resnet18/src/train.py` 还要求 `trainable_scope` 一致）。
+历史实验要复用，按报告里的参数在 `runs/` 下重新训练；续训只在本仓库产物之间进行（`cnn/train.py --resume` 要求 checkpoint 自带配置与哈希，`resnet18/src/runner.py` 还要求 `trainable_scope` 一致）。
 
 当前已有产物：
 
