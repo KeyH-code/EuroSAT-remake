@@ -5,7 +5,7 @@
 ## 目录
 
 - `cnn/`：小 CNN 的 train/evaluate/predict、源码和配置模板。
-- `resnet18/`：ResNet18 的 train/evaluate/predict、源码、配置及历史报告。
+- `resnet18/`：ResNet18 的 train/evaluate/predict、源码、配置及历史报告。当前可训练范围为 **`layer4 + fc`**（`layer3` 及更早冻结），见 `resnet18/src/model.py` 的 `TRAINABLE_SCOPE` 与 `docs/migration-record.md` 第 8 节。
 - `data/`：完整图片与原样清单，Git 忽略。
 - `runs/`：新训练、评价、预测结果，Git 忽略。**所有产物只写这里。**
 - `artifacts/`：仅存原预训练权重 `resnet18-f37072fd.pth`；运行缓存副本在 `.cache/torch/hub/checkpoints/`。
@@ -23,14 +23,16 @@ conda run -n dl-reboot python cnn/evaluate.py --checkpoint runs/cnn/first_run/ch
 conda run -n dl-reboot python cnn/predict.py --checkpoint runs/cnn/first_run/checkpoints/best.pt --input-dir <图像目录>
 
 # ResNet18：按配置的 experiment_id 新建 runs/resnet18/<experiment_id>/
-conda run -n dl-reboot python resnet18/train.py --config resnet18/configs/config16_sgd_lr_0.05_momentum_0.9_20ep.json
+conda run -n dl-reboot python resnet18/train.py --config resnet18/configs/config18_layer4_lr5e-5_20ep.json
 conda run -n dl-reboot python resnet18/evaluate.py --config <本次配置> --checkpoint runs/resnet18/<experiment_id>/checkpoints/best.pt
 conda run -n dl-reboot python resnet18/predict.py --config <本次配置> --checkpoint runs/resnet18/<experiment_id>/checkpoints/best.pt --input-dir <图像目录>
 ```
 
 CNN 新实验要先将 `cnn/configs/baseline.json` 复制到一个全新的 `runs/cnn/<实验名>/config.json` 并按需修改；训练产物与该配置同目录。`cnn/evaluate.py` 与 `cnn/predict.py` 的 `--checkpoint` 是必填参数，且必须是本仓库 `runs/` 下的产物。
 
-ResNet18 按 `experiment_id` 创建新目录，目录已存在会拒绝覆盖。`resnet18/configs/config01`–`16` 的 `experiment_id` 已被历史运行占用，复用同名配置前请先改 `experiment_id`。
+ResNet18 按 `experiment_id` 创建新目录，目录已存在会拒绝覆盖。`resnet18/configs/config01`–`17` 的 `experiment_id` 已被运行占用，复用同名配置前请先改 `experiment_id`。
+
+**学习率注意**：`config01`–`16` 的 lr（0.001–0.05）是**冻结分类头**设定下调出来的。解冻 layer4 后 0.001 与 3e-4 会在第一个 batch 之后退化（loss 塌到 0、logits 爆炸），已实测稳定上限约为 5e-5–1e-4。改配置时不要直接沿用旧 lr。
 
 ## 历史产物与重训
 
