@@ -77,7 +77,7 @@ def main():
     torch.cuda.manual_seed_all(seed)
 
     # 当前学习者模型保持直接定义；延迟导入，缺配置时不会请求预训练权重。
-    from model import model
+    from model import model, TRAINABLE_SCOPE
 
     model.to(DEVICE)
     train_transform,val_transform = make_transforms(config)
@@ -88,7 +88,8 @@ def main():
         config["loader"]["seed"]
     )
     optimizer = make_optimizer(model, config)
-    scaler = torch.amp.GradScaler("cuda")
+    # 默认 65536 对解冻后的 layer4 过大，首个 step 会溢出跳步；1024 实测全程 0 跳步。
+    scaler = torch.amp.GradScaler("cuda", init_scale=1024)
     criterion = nn.CrossEntropyLoss()
 
     config_snapshot = run_dir / "config.json"
@@ -96,6 +97,21 @@ def main():
         if not config_snapshot.is_file():
             raise FileNotFoundError("续训目录缺少 config.json")
         previous_config = json.loads(config_snapshot.read_text(encoding="utf-8"))
+        # 可训练范围属于数据/模型契约，必须在恢复优化器状态之前先核对：从「只训分类头」
+        # 的实验续训到「解冻 layer4」的实现，会凭空训练一批从未被优化过的权重。
+        checkpoint = torch.load(
+            run_dir / "checkpoints" / "last.pt", map_location="cpu", weights_only=False
+        )
+        recorded_scope = checkpoint.get("config", {}).get("trainable_scope")
+        if recorded_scope is None:
+            raise ValueError(
+                "checkpoint 未记录可训练范围（trainable_scope），无法确认与当前实现一致，拒绝续训"
+            )
+        if recorded_scope != TRAINABLE_SCOPE:
+            raise ValueError(
+                f"可训练范围不一致：checkpoint={recorded_scope!r} 当前={TRAINABLE_SCOPE!r}；"
+                "跨范围续训会训练一批从未被优化过的权重，请新建实验目录"
+            )
         # 续训只允许增加目标总轮数；数据、模型输入和优化器参数必须保持一致。
         previous_settings = {key: value for key, value in previous_config.items() if key != "epoch"}
         current_settings = {key: value for key, value in config.items() if key != "epoch"}
