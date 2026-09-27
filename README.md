@@ -8,6 +8,7 @@
 
 - `cnn/`：小 CNN 的 train/evaluate/predict、源码和配置模板。
 - `resnet18/`：ResNet18 的 train/evaluate/predict、源码、配置及实验报告。当前可训练范围为 **`layer4 + fc`**（`layer3` 及更早冻结），见 `resnet18/src/model.py` 的 `TRAINABLE_SCOPE`；结论依据见 `resnet18/reports/09_history_baselines.md`。
+- `baseline/`：CNN 与 ResNet18 当前最佳验证结果对应的训练配置参考；基线来源和指标见 `baseline/README.md`。这里仅放配置和说明，不放训练产物。
 - `data/`：完整图片与原样清单，Git 忽略。
 - `runs/`：训练、评价、预测结果，Git 忽略。**所有产物只写这里。**
 - `artifacts/`：原预训练权重 `resnet18-f37072fd.pth`；运行缓存副本在 `.cache/torch/hub/checkpoints/`。
@@ -44,6 +45,7 @@ ResNet18 按 `experiment_id` 创建新目录，目录已存在会拒绝覆盖。
 
 ## 实验记录
 
+- `baseline/README.md`：CNN 与 ResNet18 的最佳验证配置来源、选择口径及对应指标。
 - `resnet18/reports/01`–`08`：ResNet18 冻结分类头阶段的逐次实验报告。
 - `resnet18/reports/09_history_baselines.md`：两个模型全部历史实验的 val 指标与参数索引汇总。
 

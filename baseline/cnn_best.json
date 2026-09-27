@@ -1,0 +1,53 @@
+{
+  "experiment_id": "cnn_best_baseline_reference",
+  "data": {
+    "manifest_path": "data/manifests/my_split.csv",
+    "manifest_sha256": "66730fa4825f2aa75366389b428023d2e50ed93e625b8448f6b9f45a690e54bf",
+    "train_samples": 18900,
+    "val_samples": 4050,
+    "test_samples": 4050,
+    "split_seed": 42
+  },
+  "model": {
+    "name": "EurosatCNN",
+    "num_classes": 10
+  },
+  "training": {
+    "seed": 20260920,
+    "batch_size": 128,
+    "epochs": 30,
+    "optimizer": "AdamW",
+    "learning_rate": 0.003,
+    "weight_decay": 0.01,
+    "scheduler": {
+      "name": "linear_warmup_then_constant",
+      "start_learning_rate": 0.0003,
+      "target_learning_rate": 0.003,
+      "warmup_epochs": 1,
+      "step_unit": "optimizer_step"
+    },
+    "precision": "fp32",
+    "augmentation": "none"
+  },
+  "evaluation": {
+    "split": "val",
+    "every_epoch": true,
+    "save_overall_metrics": true,
+    "save_per_class_metrics": true,
+    "save_confusion_matrix": true,
+    "export_error_samples": "best_checkpoint_only"
+  },
+  "runtime": {
+    "device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "outputs": {
+    "sessions": "sessions.jsonl",
+    "metrics": "metrics.jsonl",
+    "learning_rate_history": "learning_rate_history.jsonl",
+    "per_class_metrics": "per_class_metrics.jsonl",
+    "confusion_matrices": "confusion_matrices",
+    "checkpoints": "checkpoints",
+    "final_evaluation": "final_evaluation"
+  }
+}
