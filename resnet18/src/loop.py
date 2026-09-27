@@ -9,7 +9,9 @@ from torch import nn
 from data import DEVICE
 
 
-def train_one_epoch(model, train_loader, optimizer, scaler):
+def train_one_epoch(
+    model, train_loader, optimizer, scaler, batch_scheduler=None, label_smoothing=0.0
+):
     """跑一个 epoch，返回按样本加权的平均 loss 与在线 accuracy。
 
     两个契约：
@@ -21,11 +23,13 @@ def train_one_epoch(model, train_loader, optimizer, scaler):
     for module in model.modules():
         if isinstance(module, nn.BatchNorm2d):
             module.eval()
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
     all_loss = []
     loss_sum = 0
     samples_sum = 0
     correct = 0
+    optimizer_steps = 0
+    skipped_optimizer_steps = 0
     for x, y in train_loader:
         optimizer.zero_grad(set_to_none=True)
         x = x.to(DEVICE)
@@ -40,11 +44,22 @@ def train_one_epoch(model, train_loader, optimizer, scaler):
         samples_sum += len(x)
         all_loss.append(loss.item())
         scaler.scale(loss).backward()
+        scale_before_update = scaler.get_scale()
         scaler.step(optimizer)
         scaler.update()
+        # GradScaler 降低 scale 时表示本次 optimizer.step 因溢出被跳过。
+        # 调度器按成功的 optimizer update 计数，保证恢复时学习率进度准确。
+        if scaler.get_scale() >= scale_before_update:
+            optimizer_steps += 1
+            if batch_scheduler is not None:
+                batch_scheduler.step()
+        else:
+            skipped_optimizer_steps += 1
 
     return {
         "train_loss_ave": loss_sum / samples_sum,
         "train_all_loss": all_loss,
         "train_accuracy": correct / samples_sum,
+        "optimizer_steps": optimizer_steps,
+        "skipped_optimizer_steps": skipped_optimizer_steps,
     }

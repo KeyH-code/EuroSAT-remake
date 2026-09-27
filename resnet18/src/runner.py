@@ -7,6 +7,7 @@
 
 import argparse
 import json
+import math
 import random
 import sys
 import time
@@ -21,12 +22,75 @@ from optimizer import make_optimizer
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_DIR))  # 让正式入口能导入 Agent 支持模块。
-from src.checkpoint import load_checkpoint, save_checkpoint  # noqa: E402
+from src.checkpoint import current_learning_rate, load_checkpoint, save_checkpoint  # noqa: E402
 from src.loop import train_one_epoch  # noqa: E402
 from src.metrics import append_epoch_record, evaluate_classifier  # noqa: E402
 from src.visualization import save_experiment_visualizations  # noqa: E402
 
 OUTPUT_ROOT = REPO_ROOT / "runs" / "resnet18"
+
+# 学习率调度器配置的键必须与实现完全一致，避免改名后调度静默失效。
+_SCHEDULER_KEYS = ("name", "t_max_epochs", "eta_min")
+_COSINE_ANNEALING_NAME = "cosine_annealing"
+_WARMUP_COSINE_KEYS = (
+    "name", "t_max_epochs", "warmup_epochs", "warmup_start_factor", "eta_min"
+)
+_WARMUP_COSINE_NAME = "linear_warmup_cosine"
+
+
+def _validate_scheduler_config(config):
+    """训练前校验可学习率调度器配置；缺省表示固定学习率。"""
+    scheduler_config = config.get("scheduler")
+    if scheduler_config is None:
+        return None
+    if not isinstance(scheduler_config, dict):
+        raise ValueError("scheduler 必须是对象")
+    if scheduler_config.get("name") == _COSINE_ANNEALING_NAME:
+        expected_keys = _SCHEDULER_KEYS
+    elif scheduler_config.get("name") == _WARMUP_COSINE_NAME:
+        expected_keys = _WARMUP_COSINE_KEYS
+    else:
+        raise ValueError(f"不支持的 scheduler：{scheduler_config.get('name')!r}")
+    if set(scheduler_config) != set(expected_keys):
+        raise ValueError(
+            f"scheduler 配置字段必须恰好为 {expected_keys}，当前为 {sorted(scheduler_config)}"
+        )
+    if scheduler_config["t_max_epochs"] != config["epoch"]:
+        raise ValueError("t_max_epochs 必须等于本次训练的目标总轮数 epoch")
+    if not 0 <= scheduler_config["eta_min"] <= config["optimizer"]["learning_rate"]:
+        raise ValueError("eta_min 必须位于 [0, 基准学习率] 内")
+    if scheduler_config["name"] == _WARMUP_COSINE_NAME:
+        warmup_epochs = scheduler_config["warmup_epochs"]
+        if not isinstance(warmup_epochs, int) or not 0 < warmup_epochs < config["epoch"]:
+            raise ValueError("warmup_epochs 必须是小于总轮数的正整数")
+        if not 0 < scheduler_config["warmup_start_factor"] <= 1:
+            raise ValueError("warmup_start_factor 必须位于 (0, 1] 内")
+    return scheduler_config
+
+
+def _make_lr_scheduler(optimizer, scheduler_config, steps_per_epoch):
+    """按配置创建调度器；返回 None 表示学习率固定不变。
+
+    余弦退火的周期取本次训练的目标总轮数，因此从已有实验续训时会接着原进度继续退火。
+    """
+    if scheduler_config is None:
+        return None
+    if scheduler_config["name"] == _WARMUP_COSINE_NAME:
+        from src.lr_scheduler import LinearWarmupCosineScheduler
+
+        return LinearWarmupCosineScheduler(
+            optimizer,
+            total_epochs=scheduler_config["t_max_epochs"],
+            warmup_epochs=scheduler_config["warmup_epochs"],
+            steps_per_epoch=steps_per_epoch,
+            start_factor=scheduler_config["warmup_start_factor"],
+            eta_min=scheduler_config["eta_min"],
+        )
+    return torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=scheduler_config["t_max_epochs"],
+        eta_min=scheduler_config["eta_min"],
+    )
 
 
 def main():
@@ -36,6 +100,15 @@ def main():
     args = parser.parse_args()
     config_path = args.config.resolve()
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    scheduler_config = _validate_scheduler_config(config)
+    label_smoothing = config.get("label_smoothing", 0.0)
+    if (
+        isinstance(label_smoothing, bool)
+        or not isinstance(label_smoothing, (int, float))
+        or not math.isfinite(label_smoothing)
+        or not 0.0 <= label_smoothing < 1.0
+    ):
+        raise ValueError("label_smoothing 必须是 [0, 1) 内的有限数值")
     experiment_id = config.get("experiment_id", config_path.stem)
     run_dir = (OUTPUT_ROOT / experiment_id).resolve()
     if not run_dir.is_relative_to(OUTPUT_ROOT.resolve()) or run_dir == OUTPUT_ROOT.resolve():
@@ -60,6 +133,7 @@ def main():
         config["loader"]["seed"]
     )
     optimizer = make_optimizer(model, config)
+    lr_scheduler = _make_lr_scheduler(optimizer, scheduler_config, len(train_loader))
     # 默认 65536 对解冻后的 layer4 过大，首个 step 会溢出跳步；1024 实测全程 0 跳步。
     scaler = torch.amp.GradScaler("cuda", init_scale=1024)
     criterion = nn.CrossEntropyLoss()
@@ -92,7 +166,7 @@ def main():
         checkpoint = load_checkpoint(
             run_dir / "checkpoints" / "last.pt",
             model=model, optimizer=optimizer, scaler=scaler, map_location="cpu",
-            train_loader=train_loader, restore_rng=True,
+            train_loader=train_loader, restore_rng=True, lr_scheduler=lr_scheduler,
         )
         start_epoch = checkpoint["epoch"] + 1
         best_epoch = checkpoint["best_epoch"]
@@ -112,7 +186,19 @@ def main():
     for epoch in range(start_epoch, config["epoch"] + 1):
         torch.cuda.reset_peak_memory_stats()
         started = time.perf_counter()
-        train_data = train_one_epoch(model, train_loader, optimizer, scaler)
+        learning_rate_start = current_learning_rate(optimizer)
+        batch_scheduler = lr_scheduler if getattr(lr_scheduler, "step_per_batch", False) else None
+        train_data = train_one_epoch(
+            model,
+            train_loader,
+            optimizer,
+            scaler,
+            batch_scheduler=batch_scheduler,
+            label_smoothing=label_smoothing,
+        )
+        if lr_scheduler is not None and batch_scheduler is None:
+            # 每个 epoch 结束后推进一步：第 1 轮用基准学习率，之后按余弦下降。
+            lr_scheduler.step()
         # 训练函数由学习者提供这两个按样本累计的数值；Agent 不替写更新步骤。
         train_loss = float(train_data["train_loss_ave"])
         train_accuracy = float(train_data["train_accuracy"])
@@ -126,7 +212,12 @@ def main():
         append_epoch_record(
             run_dir, epoch, train_loss, train_accuracy, val_result,
             extras={
-                "learning_rate": optimizer.param_groups[0]["lr"],
+                # 学习率取优化器当前值：余弦退火只改写 param_groups，epoch 记录才看得见。
+                "learning_rate": current_learning_rate(optimizer),
+                "learning_rate_start": learning_rate_start,
+                "learning_rate_end": current_learning_rate(optimizer),
+                "optimizer_steps": train_data["optimizer_steps"],
+                "skipped_optimizer_steps": train_data["skipped_optimizer_steps"],
                 "seconds": seconds,
                 "peak_allocated_mb": torch.cuda.max_memory_allocated() / 2**20,
                 "peak_reserved_mb": torch.cuda.max_memory_reserved() / 2**20,
@@ -140,15 +231,20 @@ def main():
             checkpoint_dir / "last.pt", model=model, optimizer=optimizer,
             scaler=scaler, epoch=epoch, best_epoch=best_epoch,
             best_val_accuracy=best_val_accuracy, config=config, train_loader=train_loader,
+            lr_scheduler=lr_scheduler,
         )
         if is_best:
             save_checkpoint(
                 checkpoint_dir / "best.pt", model=model, optimizer=optimizer,
                 scaler=scaler, epoch=epoch, best_epoch=best_epoch,
                 best_val_accuracy=best_val_accuracy, config=config, train_loader=train_loader,
+                lr_scheduler=lr_scheduler,
             )
         save_experiment_visualizations(run_dir)
-        print(f"epoch={epoch} train_acc={train_accuracy:.4f} val_acc={val_result['accuracy']:.4f}")
+        print(
+            f"epoch={epoch} train_acc={train_accuracy:.4f} val_acc={val_result['accuracy']:.4f} "
+            f"lr={current_learning_rate(optimizer):.3e}"
+        )
 
 
 if __name__ == "__main__":

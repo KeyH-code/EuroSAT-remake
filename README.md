@@ -52,7 +52,6 @@ ResNet18 按 `experiment_id` 创建新目录，目录已存在会拒绝覆盖。
 当前已有产物：
 
 - `runs/cnn/baseline_ep2/`：小 CNN 2 轮，val acc 0.838519。
-- `runs/resnet18/resnet18_layer4_lr5e-5_probe_1ep_01/`：解冻 layer4 后 1 轮，val acc 0.9410。
 - `runs/resnet18/resnet18_head_probe_1ep_01/`：冻结分类头 1 轮（旧设定），val acc 0.905926。
 
 ## 测试
