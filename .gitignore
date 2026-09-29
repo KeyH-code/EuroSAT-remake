@@ -2,6 +2,7 @@
 /data/
 /artifacts/
 /runs/
+/error_samples/
 /.cache/
 __pycache__/
 .pytest_cache/
@@ -11,4 +12,3 @@ __pycache__/
 *.onnx
 *.engine
 *.log
-

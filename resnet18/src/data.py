@@ -46,7 +46,11 @@ class EuroSATDataset(Dataset):
         # 路径与 label_idx 已在同一行清单中配对；这里不预先加载整套图像。
         with Image.open(self.images[index]) as image:
             rgb = image.convert("RGB")
-        return self.transform(rgb), int(self.labels[index])
+        label = int(self.labels[index])
+        transform = self.transform
+        if isinstance(transform, dict):
+            transform = transform.get(label, transform["default"])
+        return transform(rgb), label
 
 
 def load_split_frame(split):

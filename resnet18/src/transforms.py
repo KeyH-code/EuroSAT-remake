@@ -1,6 +1,7 @@
 from torchvision.transforms import v2
 import torchvision.transforms as tf
 import torch
+from data import CLASS_NAMES
 
 
 class RandomRightAngleRotation:
@@ -11,13 +12,12 @@ class RandomRightAngleRotation:
         return torch.rot90(image, quarter_turns, dims=(-2, -1))
 
 
-def make_transforms(config):
+def _make_train_transform(config, augmentation, color_jitter=None):
     train_operations = [
         v2.ToImage(),
         v2.ToDtype(dtype=torch.float32, scale=True),
         tf.Resize((224, 224)),
     ]
-    augmentation = config.get("train_augmentation", {})
     if not isinstance(augmentation, dict):
         raise ValueError("train_augmentation 必须是对象")
     allowed_keys = {
@@ -111,10 +111,67 @@ def make_transforms(config):
                 p=translation_probability,
             )
         )
+    if color_jitter is not None:
+        train_operations.append(
+            tf.RandomApply(
+                [v2.ColorJitter(
+                    brightness=color_jitter["brightness"],
+                    contrast=color_jitter["contrast"],
+                    saturation=color_jitter["saturation"],
+                    hue=color_jitter["hue"],
+                )],
+                p=color_jitter["probability"],
+            )
+        )
     train_operations.append(
         v2.Normalize(mean=config["transform"]["mean"], std=config["transform"]["std"])
     )
-    train_transform = v2.Compose(train_operations)
+    return v2.Compose(train_operations)
+
+
+def make_transforms(config):
+    augmentation = config.get("train_augmentation", {})
+    train_transform = _make_train_transform(config, augmentation)
+
+    targeted = config.get("class_conditional_augmentation")
+    if targeted is not None:
+        if not isinstance(targeted, dict) or set(targeted) not in (
+            {"classes", "color_jitter"}, {"classes", "random_crop_scale_min"}
+        ):
+            raise ValueError("class_conditional_augmentation 只能指定 classes 和一种增强")
+        classes = targeted["classes"]
+        if (
+            not isinstance(classes, list)
+            or not classes
+            or len(set(classes)) != len(classes)
+            or any(name not in CLASS_NAMES for name in classes)
+        ):
+            raise ValueError("class_conditional_augmentation.classes 必须是非空且不重复的类别列表")
+        selected_augmentation = dict(augmentation)
+        color_jitter = targeted.get("color_jitter")
+        if color_jitter is not None:
+            expected = {"probability", "brightness", "contrast", "saturation", "hue"}
+            if not isinstance(color_jitter, dict) or set(color_jitter) != expected:
+                raise ValueError(f"color_jitter 字段必须恰好为 {sorted(expected)}")
+            for key in expected:
+                value = color_jitter[key]
+                upper = 0.5 if key == "hue" else 1.0
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or not 0.0 <= value <= upper
+                ):
+                    raise ValueError(f"color_jitter.{key} 必须是 [0, {upper}] 内的数值")
+        else:
+            selected_augmentation["random_crop_scale_min"] = targeted["random_crop_scale_min"]
+            if not augmentation.get("random_crop_probability", 0.0):
+                raise ValueError("调整裁剪面积下限要求启用 random_crop_probability")
+        selected_transform = _make_train_transform(
+            config, selected_augmentation, color_jitter=color_jitter
+        )
+        train_transform = {"default": train_transform}
+        for name in classes:
+            train_transform[CLASS_NAMES.index(name)] = selected_transform
 
     val_transform = v2.Compose(
         [
