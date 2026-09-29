@@ -1,0 +1,3 @@
+# 逐样本预测、评价数据和图像留在本机；说明与计算脚本可进入 Git。
+/resnet18/validation/
+/resnet18/test/
