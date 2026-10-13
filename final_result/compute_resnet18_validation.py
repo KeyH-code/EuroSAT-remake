@@ -1,4 +1,4 @@
-"""锁定 config41 epoch17 权重，只计算固定 val 的最终审核指标。"""
+"""锁定 config41 epoch17 权重，按同一口径计算固定 val/test 指标。"""
 
 import csv
 import hashlib
@@ -34,7 +34,6 @@ from transforms import make_transforms  # noqa: E402
 
 CONFIG = ROOT / "resnet18/configs/config41_layer4_lr0p0001_warmup_cosine_bs64_flip_rotate_translate_crop_20ep.json"
 CHECKPOINT = ROOT / "runs/resnet18/resnet18_layer4_lr0p0001_warmup_cosine_bs64_flip_rotate_translate_crop_20ep_01/checkpoints/best.pt"
-OUTPUT = ROOT / "final_result/resnet18/validation"
 EXPECTED_CONFIG_SHA256 = "f6c4da80f50b71f7af303672d06f95fe856617bc4c1233eee80abf6af29da848"
 EXPECTED_CHECKPOINT_SHA256 = "8039bbce2884fa5058d939bf6973c7866492e50b714504442aba87e6af56d025"
 EXPECTED_MANIFEST_SHA256 = "66730fa4825f2aa75366389b428023d2e50ed93e625b8448f6b9f45a690e54bf"
@@ -55,12 +54,12 @@ def write_csv(path, rows, fields):
         writer.writerows(rows)
 
 
-def save_confusion_plot(matrix):
+def save_confusion_plot(matrix, output, split):
     fractions = matrix / matrix.sum(axis=1, keepdims=True)
     fig, axes = plt.subplots(1, 2, figsize=(17, 7.5), constrained_layout=True)
     for axis, values, title, fmt in (
-        (axes[0], matrix, "Validation confusion matrix: counts", "d"),
-        (axes[1], fractions * 100, "Validation confusion matrix: row %", ".1f"),
+        (axes[0], matrix, f"{split.capitalize()} confusion matrix: counts", "d"),
+        (axes[1], fractions * 100, f"{split.capitalize()} confusion matrix: row %", ".1f"),
     ):
         axis.imshow(values, cmap="Blues", vmin=0)
         axis.set_title(title)
@@ -73,29 +72,33 @@ def save_confusion_plot(matrix):
                 value = int(values[i, j]) if fmt == "d" else values[i, j]
                 color = "white" if values[i, j] > values.max() * 0.55 else "black"
                 axis.text(j, i, format(value, fmt), ha="center", va="center", fontsize=7, color=color)
-    fig.savefig(OUTPUT / "confusion_matrix.png", dpi=170)
+    fig.savefig(output / "confusion_matrix.png", dpi=170)
     plt.close(fig)
 
 
-def save_class_metric_plot(rows):
+def save_class_metric_plot(rows, output, split):
     names = [row["class"] for row in rows]
     positions = np.arange(len(names))
     fig, axes = plt.subplots(1, 2, figsize=(15, 5.2), constrained_layout=True)
     axes[0].bar(positions, [row["f1"] for row in rows], color="#2a7f80")
-    axes[0].set(title="Validation F1 by class", ylabel="F1", ylim=(0.94, 1.0))
+    f1_lower = min(row["f1"] for row in rows)
+    axes[0].set(title=f"{split.capitalize()} F1 by class", ylabel="F1", ylim=(min(0.94, f1_lower - 0.005), 1.0))
     axes[1].bar(positions, [row["roc_auc_ovr"] for row in rows], color="#4c6fa5")
     lower = min(row["roc_auc_ovr"] for row in rows)
-    axes[1].set(title="Validation ROC AUC by class (one-vs-rest)", ylabel="ROC AUC", ylim=(min(0.95, lower - 0.005), 1.0))
+    axes[1].set(title=f"{split.capitalize()} ROC AUC by class (one-vs-rest)", ylabel="ROC AUC", ylim=(min(0.95, lower - 0.005), 1.0))
     for axis in axes:
         axis.set_xticks(positions, names, rotation=55, ha="right")
         axis.grid(axis="y", alpha=0.25)
-    fig.savefig(OUTPUT / "per_class_f1_auc.png", dpi=170)
+    fig.savefig(output / "per_class_f1_auc.png", dpi=170)
     plt.close(fig)
 
 
-def main():
-    if OUTPUT.exists():
-        raise FileExistsError(f"Refusing to overwrite {OUTPUT}")
+def main(split="val"):
+    if split not in {"val", "test"}:
+        raise ValueError(f"Unsupported split: {split}")
+    output = ROOT / "final_result/resnet18" / ("validation" if split == "val" else "test")
+    if output.exists():
+        raise FileExistsError(f"Refusing to overwrite {output}")
     hashes = {
         "config_sha256": sha256(CONFIG),
         "checkpoint_sha256": sha256(CHECKPOINT),
@@ -121,8 +124,8 @@ def main():
         raise ValueError("Checkpoint experiment ID differs from config41")
     if checkpoint["config"]["transform"] != config["transform"]:
         raise ValueError("Checkpoint validation transform differs from config41")
-    _, val_transform = make_transforms(config)
-    loader = make_loader("val", val_transform, config["loader"]["batch_size"], shuffle=False)
+    _, eval_transform = make_transforms(config)
+    loader = make_loader(split, eval_transform, config["loader"]["batch_size"], shuffle=False)
     model.eval()
     probabilities, truths = [], []
     ce_sum = 0.0
@@ -137,16 +140,17 @@ def main():
     pred = probs.argmax(axis=1)
     count = len(true)
     if count != 4050 or len(loader.dataset.images) != count:
-        raise ValueError(f"Validation size differs: {count}")
+        raise ValueError(f"{split} size differs: {count}")
     if not np.allclose(probs.sum(axis=1), 1.0, atol=1e-6):
         raise ValueError("Invalid probability rows")
     accuracy = accuracy_score(true, pred)
     cross_entropy = ce_sum / count
-    if abs(accuracy - checkpoint["best_val_accuracy"]) > 1e-9:
-        raise ValueError("Fresh validation accuracy differs from checkpoint")
-    recorded_loss = 0.061789271643408285
-    if abs(cross_entropy - recorded_loss) > 1e-6:
-        raise ValueError("Fresh validation loss differs from epoch 17 record")
+    if split == "val":
+        if abs(accuracy - checkpoint["best_val_accuracy"]) > 1e-9:
+            raise ValueError("Fresh validation accuracy differs from checkpoint")
+        recorded_loss = 0.061789271643408285
+        if abs(cross_entropy - recorded_loss) > 1e-6:
+            raise ValueError("Fresh validation loss differs from epoch 17 record")
 
     labels = np.arange(len(CLASS_NAMES))
     matrix = confusion_matrix(true, pred, labels=labels)
@@ -187,8 +191,8 @@ def main():
         for i in range(15) if np.any(bins == i)
     )
     metrics = {
-        "split": "val",
-        "test_used": False,
+        "split": split,
+        "test_used": split == "test",
         "checkpoint_epoch": 17,
         "sample_count": count,
         "correct_count": int(correct.sum()),
@@ -206,28 +210,28 @@ def main():
         "class_names": list(CLASS_NAMES),
     }
 
-    OUTPUT.mkdir(parents=True, exist_ok=False)
-    (OUTPUT / "model_lock.json").write_text(json.dumps({
+    output.mkdir(parents=True, exist_ok=False)
+    (output / "model_lock.json").write_text(json.dumps({
         "checkpoint": str(CHECKPOINT), "config": str(CONFIG), "manifest": str(MANIFEST),
         "experiment_id": config["experiment_id"], "seed": 20260920,
-        "checkpoint_epoch": 17, **hashes, "split": "val", "test_used": False,
+        "checkpoint_epoch": 17, **hashes, "split": split, "test_used": split == "test",
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (OUTPUT / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    write_csv(OUTPUT / "per_class_metrics.csv", per_class, list(per_class[0]))
-    write_csv(OUTPUT / "confusion_matrix.csv", [
+    (output / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_csv(output / "per_class_metrics.csv", per_class, list(per_class[0]))
+    write_csv(output / "confusion_matrix.csv", [
         {"true_class": CLASS_NAMES[i], **{CLASS_NAMES[j]: int(matrix[i, j]) for j in labels}}
         for i in labels
     ], ["true_class", *CLASS_NAMES])
     prediction_fields = ["filepath", "true_class", "pred_class", "confidence", *[f"p_{name}" for name in CLASS_NAMES]]
-    write_csv(OUTPUT / "predictions.csv", [
+    write_csv(output / "predictions.csv", [
         {"filepath": str(loader.dataset.images[i]), "true_class": CLASS_NAMES[true[i]],
          "pred_class": CLASS_NAMES[pred[i]], "confidence": float(confidence[i]),
          **{f"p_{name}": float(probs[i, j]) for j, name in enumerate(CLASS_NAMES)}}
         for i in range(count)
     ], prediction_fields)
-    save_confusion_plot(matrix)
-    save_class_metric_plot(per_class)
-    print(json.dumps({"output": str(OUTPUT), "accuracy": accuracy, "cross_entropy": cross_entropy,
+    save_confusion_plot(matrix, output, split)
+    save_class_metric_plot(per_class, output, split)
+    print(json.dumps({"output": str(output), "split": split, "accuracy": accuracy, "cross_entropy": cross_entropy,
                       "macro_f1": aggregate["macro"]["f1"], "macro_roc_auc_ovr": aggregate["macro"]["roc_auc_ovr"]}, ensure_ascii=False))
 
 

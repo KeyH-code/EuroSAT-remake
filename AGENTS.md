@@ -5,6 +5,7 @@
 - `artifacts/legacy_eurosat/` 是历史运行记录快照，**原样冻结、不删不改、也不被任何代码读取**。
 - `artifacts/legacy_teaching/` 是教学期与迁移期的代码/文档归档，**不可运行、不可 import**；不要把它复制回 `cnn/`、`resnet18/`。
 - 数据、运行记录、模型权重和缓存不进入 Git。源码、配置模板、说明进入 Git。
+- 当前阶段最终模型为 ResNet18 config41、seed 20260920、epoch 17；已锁定权重并完成一次 test 评价（3981/4050）。当前状态和完整指标见 `final_result/README.md`。以后继续研究只用 train/val 决策，不用已查看的 test 结果调参或重新选模。
 - 沿用 `dl-reboot` Conda 环境；Windows 中文路径、文本按 UTF-8 处理。
 - 仓库当前没有自动化测试；改代码后按 `README.md` 的「测试」一节人工验证链路。
 
