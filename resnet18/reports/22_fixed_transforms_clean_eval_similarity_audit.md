@@ -63,7 +63,7 @@
 
 当前最佳11种变换的准确率在98.0247%–98.6173%，CE在0.058332–0.070351。两组各有一个seed且best时点不同，本轮没有单独隔离增强、时点或随机性的贡献。
 
-![固定变换准确率、CE与原对变错](../../runs/resnet18/analysis/data_audit_20260927_01/transform_comparison.png)
+固定变换准确率、CE与原对变错（本地产物 `runs/resnet18/analysis/data_audit_20260927_01/transform_comparison.png`）
 
 准确率轴为0.9–1.0；CE同时提供完整范围与0–0.1细节图，高于0.1的值在完整范围图和表中保留。每种变换各类别的原对→错、原错→对、真实类别概率变化、margin变化另存 `transform_per_class.csv`。
 
@@ -87,7 +87,7 @@
 
 全部train/val图片均保存10类概率、真实类别概率、CE、top1/top2和margin；逐类准确率、CE、置信度及混淆计数均落盘。
 
-![同一权重的干净train和val对照](../../runs/resnet18/analysis/data_audit_20260927_01/clean_train_val.png)
+同一权重的干净train和val对照（本地产物 `runs/resnet18/analysis/data_audit_20260927_01/clean_train_val.png`）
 
 ## 3．精确重复与训练集近邻
 

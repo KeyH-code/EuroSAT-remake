@@ -4,7 +4,7 @@
 
 - 学习者决定从第 25 轮继续到第 35 轮，每 5 轮观察一次。Agent 从 `last.pt` 先执行第 26–30 轮，再从第 30 轮续训第 31–35 轮；Luna 子 Agent 只读核对两个五轮窗口的指标，没有修改代码、配置或运行训练。
 - `configs/config04_resume30.json`、`configs/config05_resume35.json` 只把目标总轮数依次改为 30 和 35；其余数据、模型、输入/BN 统计量、batch 128、seed 20260920、AdamW lr 0.001/weight decay 0.01、FP16 AMP 均保持上一配置。恢复包含模型、优化器、scaler、随机状态和采样器。只使用既有 train/val split，test 未参与。
-- 运行目录沿用 `E:\deeplearning\.cache\datasets\eurosat\resnet18_finetune\resnet18_head_imagenet_5ep_01`；目录名来自最初 5 轮实验，不代表最终轮数。
+- 运行目录沿用 `artifacts/legacy_eurosat/resnet18_finetune/resnet18_head_imagenet_5ep_01`；目录名来自最初 5 轮实验，不代表最终轮数。
 
 ## 第 26–35 轮记录
 

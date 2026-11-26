@@ -30,7 +30,7 @@
 | SeaLake | 2 | AnnualCrop 1；Pasture 1 | AnnualCrop、Pasture 并列各1/2 |
 | **合计** | **98** | **33个非零方向** | — |
 
-![98张图片的主要误判方向矩阵](../../runs/resnet18/analysis/repeated_error_category_stats_20260928_01/dominant_error_matrix.png)
+98张图片的主要误判方向矩阵（本地产物 `runs/resnet18/analysis/repeated_error_category_stats_20260928_01/dominant_error_matrix.png`）
 
 左图是张数；右图的百分比以每一行入选图片数为分母。例如River行10/11为90.9%，只描述这11张重复误判图片。
 

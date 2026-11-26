@@ -29,7 +29,7 @@
 
 ### 原始运行目录
 
-- 0.0015：`E:\deeplearning\.cache\datasets\eurosat\resnet18_finetune\resnet18_head_lr0p0015_20ep_01`
-- 0.002：`E:\deeplearning\.cache\datasets\eurosat\resnet18_finetune\resnet18_head_lr0p002_20ep_01`
-- 0.003：`E:\deeplearning\.cache\datasets\eurosat\resnet18_finetune\resnet18_head_lr0p003_20ep_01`
-- 原 0.001：`E:\deeplearning\.cache\datasets\eurosat\resnet18_finetune\resnet18_head_imagenet_5ep_01`
+- 0.0015：`artifacts/legacy_eurosat/resnet18_finetune/resnet18_head_lr0p0015_20ep_01`
+- 0.002：`artifacts/legacy_eurosat/resnet18_finetune/resnet18_head_lr0p002_20ep_01`
+- 0.003：`artifacts/legacy_eurosat/resnet18_finetune/resnet18_head_lr0p003_20ep_01`
+- 原 0.001：`artifacts/legacy_eurosat/resnet18_finetune/resnet18_head_imagenet_5ep_01`

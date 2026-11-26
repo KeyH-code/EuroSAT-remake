@@ -8,7 +8,7 @@
 - 数据：既有 `my_split.csv`，train 18,900、val 4,050；未读取 test。仅凭 val accuracy 选择 best。
 - 参数：5 epochs；沿用既有训练入口默认 batch size 128、seed 20260920；AdamW 使用框架默认 lr 0.001、weight decay 0.01、betas `(0.9,0.999)`，其余默认。训练前向使用 CUDA FP16 autocast 和 GradScaler；loader `num_workers=0`、`pin_memory=False`。
 - 环境：Windows、RTX 4060 Laptop 8GB，PyTorch `2.14.0+cu130`、Torchvision `0.29.0+cu130`。运行前 GPU 已占用约 2452 MiB、利用率约 41%，因此本次耗时包含其他 GPU 负载影响。
-- 配置：`configs/config01.json`；运行目录：`E:\deeplearning\.cache\datasets\eurosat\resnet18_finetune\resnet18_head_imagenet_5ep_01`。
+- 配置：`configs/config01.json`；运行目录：`artifacts/legacy_eurosat/resnet18_finetune/resnet18_head_imagenet_5ep_01`。
 
 ## 逐轮结果
 

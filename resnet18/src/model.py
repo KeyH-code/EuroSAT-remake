@@ -1,9 +1,9 @@
 import os
+
 import torch
-import torchvision.models as models
-from data import NUM_CLASSES,CLASS_NAMES,REPO_ROOT
-from PIL import Image
-from torch import nn
+
+from architecture import build_resnet18
+from data import REPO_ROOT
 
 # 在请求预训练权重前，把 Torch Hub 的下载与读取目录固定到项目缓存。
 # resnet18(weights='DEFAULT') 随后会使用该目录下的 checkpoints/。
@@ -13,13 +13,9 @@ TORCH_HUB_DIR.mkdir(parents=True, exist_ok=True)
 os.environ["TORCH_HOME"] = str(TORCH_CACHE_DIR)
 torch.hub.set_dir(str(TORCH_HUB_DIR))
 
-model = models.resnet18(weights='DEFAULT')
-
-# 冻结backbone
-for parameter in model.parameters():
-    parameter.requires_grad = False
-
-model.fc = nn.Linear(model.fc.in_features,NUM_CLASSES)
+model = build_resnet18(weights="DEFAULT")
+model.requires_grad_(False)
+model.fc.requires_grad_(True)
 
 # 只训练分类头不足以产出结果，继续解冻 layer4。
 # 依据：只训分类头在 5-35 轮、12 组配置范围内历史最佳 0.9538，未达 98%；

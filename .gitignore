@@ -2,8 +2,13 @@
 /data/
 /artifacts/
 /runs/
+/eurosat-demo.zip
 /error_samples/
 /.cache/
+/logs/
+/.local-reference/
+/.vscode/
+/.venv/
 __pycache__/
 .pytest_cache/
 *.py[cod]

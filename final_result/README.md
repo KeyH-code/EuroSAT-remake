@@ -155,3 +155,15 @@ ROC AUC、average precision、macro/weighted/micro 的定义与上文 val 完全
 - `predictions.csv`：4050 张 val 图片路径、真值、预测、最高分及十类概率。
 
 `final_result/resnet18/test/` 保存同名文件，内容对应唯一一次最终 test；`model_lock.json` 标记 `split=test` 和 `test_used=true`。本次使用 `compute_resnet18_test.py` 调用相同的指标计算逻辑。生成的逐样本预测、CSV、JSON、图像及权重按仓库规则不进入 Git，两个本地结果目录均由 `final_result/.gitignore` 排除；本文记录完整汇总。
+
+## 快速运行附件
+
+CPU 示例使用 config41、seed 20260920、epoch 17 的模型参数，源 checkpoint 的哈希见上方锁定表。推理文件仅含参数、类别顺序、预处理设置与格式版本。原训练 checkpoint 用于正式评估和续训。
+
+| 文件 | SHA-256 |
+| --- | --- |
+| `eurosat-demo.zip` | `65e989502696987c06c96730325d0c983505b289ea1dd2fecf5a312b23882115` |
+| `resnet18-inference.pt` | `2a35b55ea5c7ddf5c4b1d3647e05c46b8b53d9dbf9304a2eb1dd32b9c3c90d6c` |
+| `sample/Forest_3.jpg` | `ba2da4bc6964cffc68587ca58aea8760eea163cfb6dcade77f014bebcad1f944` |
+
+样例取自固定训练划分。附件附上 EuroSAT 样例许可与来源，公开状态以 GitHub Releases 为准。[快速运行](../README.md#快速运行) · [EuroSAT 数据来源](https://zenodo.org/records/7711810)

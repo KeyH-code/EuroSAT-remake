@@ -141,7 +141,7 @@ smoothing 0.05与完整增强也同为3982张正确：完整增强修正21张、
 
 ## 图表与产物
 
-![Prediction patterns](../../runs/resnet18/analysis/prediction_patterns_20260927_01/prediction_patterns.png)
+Prediction patterns（本地产物 `runs/resnet18/analysis/prediction_patterns_20260927_01/prediction_patterns.png`）
 
 类别图纵轴是各类错误百分比0–5.5%；正确/错误置信度累计分布各自归一化；CE贡献图展示最高loss的前100张，按各模型总CE归一化。
 

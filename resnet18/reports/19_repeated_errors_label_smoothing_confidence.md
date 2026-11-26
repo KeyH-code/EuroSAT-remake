@@ -38,11 +38,11 @@
 | 5 | 14 |
 | 6 | 40 |
 
-- [六组全部误判的40张路径](../../runs/resnet18/analysis/sample_error_analysis_20260927_01/all_six_error_paths.txt)
-- [至少两组误判的95张路径](../../runs/resnet18/analysis/sample_error_analysis_20260927_01/repeated_error_paths.txt)
-- [95张重复错误汇总](../../runs/resnet18/analysis/sample_error_analysis_20260927_01/repeated_errors.csv)：真值、误判组数、误判类别频次、无 smoothing 子集频次。
-- [各实验逐样本错误详情](../../runs/resnet18/analysis/sample_error_analysis_20260927_01/repeated_errors_details.csv)：每一张图片在各组中的误判类别与置信度。
-- [四个无 smoothing 实验全部误判的48张路径](../../runs/resnet18/analysis/sample_error_analysis_20260927_01/ordinary_all_four_error_paths.txt)
+- 六组全部误判的40张路径（本地产物 `runs/resnet18/analysis/sample_error_analysis_20260927_01/all_six_error_paths.txt`）
+- 至少两组误判的95张路径（本地产物 `runs/resnet18/analysis/sample_error_analysis_20260927_01/repeated_error_paths.txt`）
+- 95张重复错误汇总（本地产物 `runs/resnet18/analysis/sample_error_analysis_20260927_01/repeated_errors.csv`）：真值、误判组数、误判类别频次、无 smoothing 子集频次。
+- 各实验逐样本错误详情（本地产物 `runs/resnet18/analysis/sample_error_analysis_20260927_01/repeated_errors_details.csv`）：每一张图片在各组中的误判类别与置信度。
+- 四个无 smoothing 实验全部误判的48张路径（本地产物 `runs/resnet18/analysis/sample_error_analysis_20260927_01/ordinary_all_four_error_paths.txt`）
 
 六组共同错误的真实类别分布：PermanentCrop 10、Pasture 6、River 6、AnnualCrop 5、Highway 5、HerbaceousVegetation 3、Forest 3、Residential 2。Industrial 和 SeaLake 没有进入六组共同错误集合。这是交集计数，不是各类总体错误率。
 
@@ -120,7 +120,7 @@ smoothing 后绝大多数图片的分数下降：0.05 对照4030/4050张下降�
 
 PermanentCrop_773、River_2031、Pasture_577仍然误判，只是错误分数下降。PermanentCrop_982在两组 smoothing 中改判正确。HerbaceousVegetation_1817在0.05正确、0.1仍错，不能将更强 smoothing 理解为逐样本单调改善。
 
-完整逐样本对照见 [label_smoothing_comparison_best.csv](../../runs/resnet18/analysis/sample_error_analysis_20260927_01/label_smoothing_comparison_best.csv)。修复/退步的具体路径见 `corrected_ls005_best.csv`、`regressed_ls005_best.csv`、`corrected_ls01_best.csv`、`regressed_ls01_best.csv`。
+完整逐样本对照见 label_smoothing_comparison_best.csv（本地产物 `runs/resnet18/analysis/sample_error_analysis_20260927_01/label_smoothing_comparison_best.csv`）。修复/退步的具体路径见 `corrected_ls005_best.csv`、`regressed_ls005_best.csv`、`corrected_ls01_best.csv`、`regressed_ls01_best.csv`。
 
 ## 为什么错误分数降低而总体 val loss 增加
 
@@ -161,7 +161,7 @@ PermanentCrop_773、River_2031、Pasture_577仍然误判，只是错误分数下
 
 ## 图表与产物
 
-![Confidence distribution and reliability](../../runs/resnet18/analysis/sample_error_analysis_20260927_01/confidence_comparison.png)
+Confidence distribution and reliability（本地产物 `runs/resnet18/analysis/sample_error_analysis_20260927_01/confidence_comparison.png`）
 
 第一幅图保留全体confidence 0–1范围；第二幅为各组错误样本置信度的累计分布（各自错误集合不同）；第三幅为15等宽分箱的置信度/实际正确率关系，小分箱点可能样本少。配对判断以逐样本对照表为准。
 

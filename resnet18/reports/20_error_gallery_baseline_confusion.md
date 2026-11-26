@@ -36,9 +36,9 @@
 
 矩阵行是真实类别，列是预测类别。总计4050张，对角线合计3972张，非对角线合计78张：3972/4050=0.9807407407407407。各类召回率的算术平均为0.9797333333333332，macro F1为0.9801873460915822。
 
-![未增强参考基线的原始计数矩阵](../../runs/resnet18/analysis/error_review_20260927_01/reference/confusion_counts.png)
+未增强参考基线的原始计数矩阵（本地产物 `runs/resnet18/analysis/error_review_20260927_01/reference/confusion_counts.png`）
 
-![未增强参考基线的错误计数矩阵](../../runs/resnet18/analysis/error_review_20260927_01/reference/confusion_errors.png)
+未增强参考基线的错误计数矩阵（本地产物 `runs/resnet18/analysis/error_review_20260927_01/reference/confusion_errors.png`）
 
 错误图隐藏正确对角线，颜色只反映非对角线错误数。各真实类别的百分比矩阵另存为 `reference/confusion_percent.png`。
 
@@ -60,13 +60,13 @@
 
 参考基线错误图片第1页：
 
-![参考基线错误图片第1页](../../runs/resnet18/analysis/error_review_20260927_01/reference/errors_page_01.png)
+参考基线错误图片第1页（本地产物 `runs/resnet18/analysis/error_review_20260927_01/reference/errors_page_01.png`）
 
 ## baseline/ 当前最佳增强基线
 
 运行：`resnet18_layer4_lr0p0001_warmup_cosine_bs64_flip_rotate_translate_crop_20ep_01`，best epoch17；配置为config41，与 `baseline/resnet18_best.json` 除 experiment_id 外一致。
 
-![当前最佳增强基线的原始计数矩阵](../../runs/resnet18/analysis/error_review_20260927_01/current_best/confusion_counts.png)
+当前最佳增强基线的原始计数矩阵（本地产物 `runs/resnet18/analysis/error_review_20260927_01/current_best/confusion_counts.png`）
 
 该矩阵总数4050、对角线3982、错误68，准确率0.9832098765432099；各类召回率算术平均0.9826，macro F1为0.9825700829334879。错误矩阵和按行百分比矩阵分别为 `current_best/confusion_errors.png`、`current_best/confusion_percent.png`。
 

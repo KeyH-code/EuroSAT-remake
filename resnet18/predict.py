@@ -17,6 +17,7 @@ PROJECT_DIR = Path(__file__).resolve().parent
 SRC_DIR = PROJECT_DIR / "src"
 sys.path.insert(0, str(SRC_DIR))
 
+from architecture import build_resnet18  # noqa: E402
 from data import CLASS_NAMES, DEVICE, NUM_CLASSES, REPO_ROOT  # noqa: E402
 from inference import UnlabeledImageDataset, predict  # noqa: E402
 from transforms import make_transforms  # noqa: E402
@@ -30,7 +31,10 @@ def main():
     parser = argparse.ArgumentParser(description="用 ResNet18 checkpoint 预测图片目录")
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--checkpoint", type=Path, required=True)
+    weights = parser.add_mutually_exclusive_group(required=True)
+    weights.add_argument("--checkpoint", type=Path, help="原训练 checkpoint，需原样划分清单")
+    weights.add_argument("--inference-weights", type=Path, help="独立推理权重，默认使用 CPU")
+    parser.add_argument("--device", choices=("cpu", "cuda"), help="覆盖默认推理设备")
     parser.add_argument("--output-csv", type=Path, help="默认按时间写入 runs/resnet18/predictions")
     args = parser.parse_args()
 
@@ -39,16 +43,34 @@ def main():
     dataset = UnlabeledImageDataset(args.input_dir, eval_transform)
     loader = DataLoader(dataset, batch_size=config["loader"]["batch_size"], shuffle=False)
 
-    # 当前模型直接定义；延迟导入，缺配置时不会请求预训练权重。
-    from model import model  # noqa: E402
+    if args.inference_weights:
+        device = torch.device(args.device or "cpu")
+        # 完整模型参数已在推理文件内，构建结构时无需下载初始化权重。
+        model = build_resnet18()
+        inference_weights = torch.load(args.inference_weights, map_location="cpu", weights_only=True)
+        if (
+            not isinstance(inference_weights, dict)
+            or inference_weights.get("schema_version") != 1
+            or inference_weights.get("class_names") != list(CLASS_NAMES)
+            or "transform" not in inference_weights
+            or "model_state" not in inference_weights
+        ):
+            raise ValueError("推理权重格式或类别顺序与 EuroSAT ResNet18 不一致")
+        recorded_transform = inference_weights["transform"]
+        model.load_state_dict(inference_weights["model_state"])
+    else:
+        device = torch.device(args.device) if args.device else DEVICE
+        from model import model  # noqa: E402
 
-    model.to(DEVICE)
-    # checkpoint 校验清单哈希、类别顺序与模型结构。
-    checkpoint = load_checkpoint(args.checkpoint, model=model, map_location="cpu")
-    if config["transform"] != checkpoint["config"]["transform"]:
-        raise ValueError("预测预处理与 checkpoint 训练配置不一致")
+        # 原训练 checkpoint 继续校验划分清单、类别顺序和模型结构。
+        checkpoint = load_checkpoint(args.checkpoint, model=model, map_location="cpu")
+        recorded_transform = checkpoint["config"]["transform"]
 
-    filepaths, pred_indices, confidences = predict(model, loader, DEVICE)
+    if config["transform"] != recorded_transform:
+        raise ValueError("预测预处理与训练配置不一致")
+    model.to(device)
+
+    filepaths, pred_indices, confidences = predict(model, loader, device)
     rows = [
         {
             "filepath": filepath,
@@ -76,8 +98,11 @@ def main():
         raise FileExistsError(f"拒绝覆盖已有预测结果：{output_csv}")
     pd.DataFrame(rows).to_csv(output_csv, index=False, encoding="utf-8-sig")
 
-    print("device:", torch.cuda.get_device_name(0))
-    print("checkpoint:", args.checkpoint)
+    print("device:", torch.cuda.get_device_name(device) if device.type == "cuda" else device)
+    if args.inference_weights:
+        print("inference weights:", args.inference_weights)
+    else:
+        print("checkpoint:", args.checkpoint)
     print("input images:", len(dataset))
     print("predictions:", len(rows))
     print("output:", output_csv)

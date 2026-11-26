@@ -44,9 +44,9 @@
 
 学习率主对照包含 train/val accuracy 和 loss；batch size 对照单独成图。accuracy 纵轴固定在 0.90–1.00，loss 固定在 0.00–0.10。区间外数据被裁切，原值仍保留在 CSV 与各 run 的 `metrics.jsonl`。因此 1e-6 初期低于 0.90 的 accuracy 和高于 0.10 的 loss 不会完整显示在缩放图中。
 
-![Layer4+FC learning-rate comparison](../../runs/resnet18/analysis/learning_rate_exploration_zoom.png)
+Layer4+FC learning-rate comparison（本地产物 `runs/resnet18/analysis/learning_rate_exploration_zoom.png`）
 
-![Batch-size comparison](../../runs/resnet18/analysis/batch_size_comparison_zoom.png)
+Batch-size comparison（本地产物 `runs/resnet18/analysis/batch_size_comparison_zoom.png`）
 
 逐轮可机器读取表：`runs/resnet18/analysis/epoch_comparison.csv`；汇总表：`runs/resnet18/analysis/learning_rate_baseline.csv`。
 

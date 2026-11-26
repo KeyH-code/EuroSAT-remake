@@ -44,7 +44,7 @@
 | 20260930 | LS 0.05 config46 | 10 | 3983 | 0.983457 | 0.117890 | 1.000000 | 0.980988 |
 | 20260930 | 完整增强 config47 | 7 | 3973 | 0.980988 | 0.064959 | 0.993704 | 0.980494 |
 
-![三个 seed 的 best val accuracy 与普通 CE](../../runs/resnet18/analysis/three_seed_factor_comparison_20260929_01/three_seed_best_comparison.png)
+三个 seed 的 best val accuracy 与普通 CE（本地产物 `runs/resnet18/analysis/three_seed_factor_comparison_20260929_01/three_seed_best_comparison.png`）
 
 图左 accuracy 轴缩放为0.975–0.985，图右普通 CE 轴为0.05–0.14。两个指标均取**最高 val accuracy 的 checkpoint**；右图不是各组独立的最低 val loss 轮次。
 

@@ -4,7 +4,7 @@
 
 - 学习者要求在原方案上再续训 10 轮。Agent 从第 15 轮的 `last.pt` 恢复模型、AdamW、GradScaler、随机状态及训练采样器状态，执行第 16–25 轮；本次 Agent 运行不替代学习者关键运行与审查。
 - `configs/config03_resume25.json` 与前一配置 `config02_resume15.json` 只有目标总轮数 `epoch: 15 → 25` 不同。模型、ImageNet 输入归一化与冻结 BN 统计量、既有 EuroSAT split、batch 128、seed 20260920、AdamW lr 0.001/weight decay 0.01、FP16 AMP 均保持一致。只用 val 选模，未使用 test。
-- 沿用原运行目录 `E:\deeplearning\.cache\datasets\eurosat\resnet18_finetune\resnet18_head_imagenet_5ep_01`。目录名记载初次 5 轮实验的来源；实际累计轮数由配置与指标记录确认。
+- 沿用原运行目录 `artifacts/legacy_eurosat/resnet18_finetune/resnet18_head_imagenet_5ep_01`。目录名记载初次 5 轮实验的来源；实际累计轮数由配置与指标记录确认。
 
 ## 逐轮结果
 

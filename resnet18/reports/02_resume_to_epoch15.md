@@ -31,4 +31,4 @@
 
 同一 split 的小型自定义 CNN 已验证 best=0.9402@28（3808/4050）；本次预训练 ResNet-18 best 多正确 42 张。网络结构和预训练来源等条件同时变化，不能单独归因于参数量；这条预训练结果也不替代 M2 当前的“自定义 CNN ≥98%”要求。后续实验方向由学习者根据本次结果决定。
 
-第 6–15 轮的原始记录保留在 `E:\deeplearning\.cache\datasets\eurosat\resnet18_finetune\resnet18_head_imagenet_5ep_01` 的 `metrics.jsonl` 中。该目录后来继续训练至第 35 轮，当前图表、checkpoint 与 `final_evaluation/` 反映更新后的状态，详情见 `reports/03_resume_to_epoch25.md`、`reports/04_resume_to_epoch35.md`。原始前 5 轮的配置和逐轮指标分别保留在 `configs/config01.json` 与同一 `metrics.jsonl` 的前 5 行。
+第 6–15 轮的原始记录保留在 `artifacts/legacy_eurosat/resnet18_finetune/resnet18_head_imagenet_5ep_01` 的 `metrics.jsonl` 中。该目录后来继续训练至第 35 轮，当前图表、checkpoint 与 `final_evaluation/` 反映更新后的状态，详情见 `reports/03_resume_to_epoch25.md`、`reports/04_resume_to_epoch35.md`。原始前 5 轮的配置和逐轮指标分别保留在 `configs/config01.json` 与同一 `metrics.jsonl` 的前 5 行。

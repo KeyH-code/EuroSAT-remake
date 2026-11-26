@@ -1,0 +1,1 @@
+resnet18/configs/config41_layer4_lr0p0001_warmup_cosine_bs64_flip_rotate_translate_crop_20ep.json text eol=lf
